@@ -4,7 +4,7 @@
 
 ### Roles & Terms
 
-This document follows the shared glossary defined in the repository root README (`AI developer`, `internal orchestration`, `runtime`, `hook layer`, and `humans`). It uses those terms as defined there and does not introduce additional role names.
+This document follows the shared glossary defined in the same directory's README (`AI developer`, `internal orchestration`, `runtime`, `hook layer`, and `humans`). It uses those terms as defined there and does not introduce additional role names.
 
 Ability routing is the infrastructure that makes it easy for an AI-first project to reuse existing tools instead of “reinventing the wheel”, while keeping the code base transparent, consistent, and controllable.
 
