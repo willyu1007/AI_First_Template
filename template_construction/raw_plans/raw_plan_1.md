@@ -281,11 +281,11 @@ docs/
 4. **保证目录结构在版本库中可见**
    - 对仅含空目录的路径，通过增加 `README.md` 或 `.gitkeep`/`.gitignore` 的方式，使其被版本控制系统跟踪。
   
-将以上信息整理并记录到``template_construction/phase_outcome.md`中。
+将以上信息整理并记录。
 
 #### 4.2 后续准备
 
-在`template_construction/phase_preparation.md`中，整理以下内容
+整理以下内容
 
 - `DOCS_CONVENTION.md` 初步说明：  
   - `AGENTS.md` / `README.md` / `knowledge/` 三者的角色差异；  
