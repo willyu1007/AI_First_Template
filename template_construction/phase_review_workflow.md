@@ -2,7 +2,7 @@
 
 > **Purpose**: After each build phase of the repository template, use this prompt to drive a **Phase Review agent** that checks whether new or changed files:  
 > (1) follow the architecture specs, and  
-> (2) meet the goals of the current phase (`plan/stage_N.md`).
+> (2) meet the goals of the current phase (`plan/phase_N.md`).
 
 This document is itself a **prompt** for an AI reviewer. It describes how that reviewer should behave.
 
@@ -17,7 +17,7 @@ Your job is to:
 1. Examine the **results of a single phase** (N from 1 to 8).
 2. Check whether the changes:
    - Respect the architecture and cross‑document alignment rules.
-   - Satisfy the intent and scope described in `plan/stage_N.md`.
+   - Satisfy the intent and scope described in `plan/phase_N.md`.
    - Prepare a solid foundation for the next phase.
 3. Produce a **structured review** with:
    - A clear verdict: `PASS`, `PASS_WITH_WARNINGS`, or `FAIL`.
@@ -52,7 +52,7 @@ When this workflow is invoked, the calling system should provide you with:
    - `devops_extension_guide.md`
 
 4. **Phase plan**
-   - The full text of `stage_N.md` for this phase.
+   - The full text of `phase_N.md` for this phase.
 
 5. **Change set**
    - A human‑readable diff summary, or
@@ -110,7 +110,7 @@ When invoked, follow this procedure:
 ### Step 1 – Understand the phase
 
 1. Read the phase metadata (`phase_id`, `phase_name`, short goal summary).
-2. Read the corresponding `stage_N.md` carefully.
+2. Read the corresponding `phase_N.md` carefully.
 3. Summarize in your own words:
    - **Scope**: what this phase is supposed to do and *not* do.
    - **Key outputs**: what should exist or be updated at the end of the phase.
@@ -138,7 +138,7 @@ When invoked, follow this procedure:
    - `BLOCKED`
 3. Read relevant portions of `workdocs/context.md` to understand:
    - What actually happened during this phase.
-   - Any explicit trade‑offs or deviations from `stage_N.md`.
+   - Any explicit trade‑offs or deviations from `phase_N.md`.
 
 If an outcome file for this phase already exists in `workdocs/outcome/`, read it as well.
 
@@ -195,10 +195,10 @@ Where you find a likely violation, record it as a **blocking** or **non‑blocki
 
 ### Step 6 – Check alignment with the phase plan
 
-Compare observed changes with `stage_N.md` and `workdocs/task.md`:
+Compare observed changes with `phase_N.md` and `workdocs/task.md`:
 
 1. Did the phase:
-   - Deliver the **core outputs** described in `stage_N.md`?
+   - Deliver the **core outputs** described in `phase_N.md`?
    - Respect stated “do / do not do” boundaries?
 2. Are there **missing artifacts** that are clearly required by the phase plan?
 3. Did the phase accidentally **pull in work** that belongs to a different phase?
@@ -213,7 +213,7 @@ If there are intentional deviations (e.g. simplified design), check that:
 
 For the next phase `N+1`:
 
-1. Look at the short description of the next phase (from `workdocs/plan.md` or `stage_{N+1}.md` if provided).
+1. Look at the short description of the next phase (from `workdocs/plan.md` or `phase_{N+1}.md` if provided).
 2. Ask whether the outputs from this phase are **sufficient and stable** to support that next step.
 3. Identify any **gaps** that will cause friction or confusion in the next phase, even if they are not strict violations.
 
@@ -264,7 +264,7 @@ For each item, briefly state **Pass / Partial / Fail / Uncertain** and why.
   - Description: …  
   - Suggested follow‑up phase or task: e.g. “Phase 8 – quality and docs polish”
 
-## 3. Alignment with Phase Plan (stage_<N>.md)
+## 3. Alignment with Phase Plan (phase_<N>.md)
 
 ### 3.1 Expected outputs vs actual
 

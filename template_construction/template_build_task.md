@@ -37,14 +37,14 @@ There are also 8 planning documents:
 
 In addition, `template_construction/construction_principles.md` defines the **global principles and rules** for building the template. It governs collaboration between external AIs and humans, phase gating, and `workdocs/` usage, and it **sits above the 8 construction phases and applies to all of them**.
 
-- `template_construction/plan/stage_1.md` – repo skeleton (directories + empty files) and global layout.
-- `template_construction/plan/stage_2.md` – documentation conventions and `AGENTS.md` structure.
-- `template_construction/plan/stage_3.md` – core mechanism docs and standard flows.
-- `template_construction/plan/stage_4.md` – registration scripts and registry collaboration.
-- `template_construction/plan/stage_5.md` – scaffolding and interactive flows (AI + human).
-- `template_construction/plan/stage_6.md` – initial registration of knowledge/abilities/hooks and validation.
-- `template_construction/plan/stage_7.md` – Agent Runtime, Tool Runner, Hook Runner.
-- `template_construction/plan/stage_8.md` – ability/knowledge completion, documentation refinement, quality system.
+- `template_construction/plan/phase_1.md` – repo skeleton (directories + empty files) and global layout.
+- `template_construction/plan/phase_2.md` – documentation conventions and `AGENTS.md` structure.
+- `template_construction/plan/phase_3.md` – core mechanism docs and standard flows.
+- `template_construction/plan/phase_4.md` – registration scripts and registry collaboration.
+- `template_construction/plan/phase_5.md` – scaffolding and interactive flows (AI + human).
+- `template_construction/plan/phase_6.md` – initial registration of knowledge/abilities/hooks and validation.
+- `template_construction/plan/phase_7.md` – Agent Runtime, Tool Runner, Hook Runner.
+- `template_construction/plan/phase_8.md` – ability/knowledge completion, documentation refinement, quality system.
 
 **Interpretation rules:**
 
@@ -121,7 +121,7 @@ This `workdocs/` is **only** for the “build the repo template” meta‑task. 
 - Holds the **overall 8‑phase roadmap** and its current interpretation.
 - For each phase, record:
   - Phase ID (`1`–`8`).
-  - One‑sentence goal (from `plan/stage_*.md`).
+  - One‑sentence goal (from `plan/phase_*.md`).
   - Scope and main outputs.
   - Dependencies on previous phases.
 - When you refine how a phase should be executed (without changing its intent), update `plan.md` and briefly explain why.
@@ -133,7 +133,7 @@ Use `task.md` as the **active task ledger** during template construction.
 Suggested structure:
 
 - A table or list with fields like:
-  - `stage_id`
+  - `phase_id`
   - `task_id` (short slug)
   - `description`
   - `status` (`PLANNED | IN_PROGRESS | BLOCKED | DONE | CANCELLED`)
@@ -201,7 +201,7 @@ Each outcome file should:
 
 ## 5. Eight‑Phase Working Loop
 
-Use the following loop to gradually build the template. The high‑level intent of each phase is defined by `template_construction/plan/stage_*.md`; the steps below define **how you work**.
+Use the following loop to gradually build the template. The high‑level intent of each phase is defined by `template_construction/plan/phase_*.md`; the steps below define **how you work**.
 
 ### Phase 0 – Orientation
 
@@ -216,7 +216,7 @@ Before starting Phase 1:
    - `blueprint/devops_extension_guide.md`
    - `blueprint/README.md`
    - `template_construction/construction_principles.md` - global principles and rules for template construction.
-2. Skim `stage_1.md`–`stage_8.md` to understand the overall flow.
+2. Skim `phase_1.md`–`phase_8.md` to understand the overall flow.
 3. Initialize `workdocs/plan.md`, `task.md`, `context.md`, and `todolist.md`.
 
 ### General pattern for each phase N (1–8)
@@ -226,7 +226,7 @@ For each phase `N`:
 1. **Refresh context**
    - Re‑read `workdocs/context.md`.
    - Re‑read the section for phase `N` in `workdocs/plan.md`.
-   - Carefully read `stage_N.md` and extract:
+   - Carefully read `phase_N.md` and extract:
      - Phase goal in one sentence.
      - In‑scope and out‑of‑scope items.
      - Expected outputs.
