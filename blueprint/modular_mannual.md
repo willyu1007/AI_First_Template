@@ -4,7 +4,7 @@
 
 ### Roles & Terms
 
-This document follows the shared glossary defined in the same directory's README (`AI developer`, `internal orchestration`, `runtime`, `hook layer`, and `humans`). It uses those terms as defined there and does not introduce additional role names.
+This document follows the shared glossary defined for AI-facing docs in this repository (for example, the project-level `AGENTS.md` and any shared glossary it references). It uses the standard terms `AI developer`, `Agent Runtime`, `Tool Runner`, `Hook Runner`, and `humans` as defined there and does not introduce additional role names.
 
 ### Related Specs & Recommended Reading
 

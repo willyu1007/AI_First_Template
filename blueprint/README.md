@@ -3,7 +3,7 @@
 
 This repository template is designed for **AI-first development**, where an AI developer (a code-capable model) is the primary implementer, and humans plus a thin runtime provide guardrails, approvals, and integrations.
 
-This README gives both humans and AIs a **single mental model** for the template, tying together:
+This README gives humans a **single mental model** for the template, tying together:
 
 - Modular layout
 - Strategy docs (`AGENTS.md`)
@@ -36,7 +36,7 @@ Whenever these docs talk about “orchestration” or “task orchestration”, 
 - **Runtime** – a long-running process (or set of processes) that:
   - Receives user input or system events
   - Runs hooks on key events
-  - Executes abilities via a standard execution script
+  - Delegates ability execution to the Tool Runner
   - Persists logs and task metadata
 - **Hooks** – small, event-driven pieces of infrastructure that run around the AI’s work (before/after prompts or ability calls, at session end). They provide:
   - Routing hints
@@ -210,20 +210,22 @@ This keeps context small and targeted, while making document discovery systemati
 
 Ability routing defines how the AI discovers and uses **reusable capabilities** (scripts, APIs, MCP tools, workflows, agents) instead of rewriting logic from scratch.
 
-### 5.1 Ability pool and execution script
+### 5.1 Ability pool and Tool Runner
 
-The project maintains a **global ability pool** with a **single standard execution script**. The AI:
+The project maintains a **global ability pool** with a **single standard Tool Runner**. In interactive sessions, external AI systems talk to the **Agent Runtime**, which in turn uses the Tool Runner; in background contexts (CI, cron, admin scripts), humans or automation may call the Tool Runner directly.
 
-- Does **not** call raw scripts/APIs directly
-- Always goes through the execution script to:
+From the AI developer’s perspective:
+
+- It does **not** call raw scripts/APIs directly.
+- It issues high-level actions (for example, “create task”, “run task”) to the Agent Runtime, which uses the Tool Runner to:
   - Create tasks
   - Run tasks
   - Query results
 
-The execution script:
+The Tool Runner:
 
-- Applies guardrails and configuration
-- Chooses implementations (script / MCP / API)
+- Applies configuration and hook-based guardrails (via `PreAbilityCall` / `PostAbilityCall` hooks and ability-level `hooks.pre_call` / `hooks.post_call` bindings).
+- Chooses implementations (script / MCP / API) according to ability registries and configuration.
 - Records usage in `.system/implement/<task-key>/tool_call.md`
 
 ### 5.2 High-level vs low-level abilities
@@ -265,9 +267,9 @@ Configuration files (per environment) define:
 
 - Which implementations are active
 - Parameters (endpoints, servers, prompts, timeouts)
-- Guardrails (rate limits, environment rules)
+- Hook bindings and policy (for example, which `hooks.pre_call` / `hooks.post_call` hooks apply)
 
-The AI’s job is to **respect registry contracts** and call the execution script; it does not need to know the runtime details.
+The AI’s job is to **respect registry contracts** and use the Agent Runtime’s / Tool Runner’s task interfaces; it does not need to know the underlying runtime details.
 
 ### 5.4 Typical ability usage flow
 
@@ -276,8 +278,8 @@ For a planned step like “run signup E2E tests” the AI should:
 1. Open the relevant `ABILITY.md`
 2. Look for a matching high-level ability (e.g. `signup_e2e_test`)
 3. Check the registry for required input/output
-4. Ask the execution script to create a task
-5. Run the task when appropriate
+4. Ask the Agent Runtime (or a CLI that wraps the Tool Runner) to create a task
+5. Run the task when appropriate via the same interface
 6. If no high-level ability fits, assemble a chain of low-level operations instead
 
 This keeps orchestration logic at the semantic level while keeping runtime behavior consistent and auditable.
@@ -576,5 +578,3 @@ The following markdown documents provide deeper reference material for this temp
 - `ability_routing.md` – ability registries, the standard execution script, and `ABILITY.md` usage.
 - `hooks.md` – event-driven hook system around prompts and ability calls.
 - `devops_extension_guide.md` – project initialization, database mirrors, packaging, and deployment.
-
-

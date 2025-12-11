@@ -1,163 +1,196 @@
-# 阶段八：能力与知识补全、文档层完善与质量体系建设规划
+# 阶段八：能力与知识补全、文档层完善与质量体系建设规划（改进版）
 
-> 目标（一句话）：在前七阶段完成架构与运行时建设的基础上，**补齐模板内“基础设施能力族”和关键知识文档，搭建清晰的人类说明层，并通过系统测试与 CI 把模板打磨到可复用、可信赖的工程资产水平**；斜杠命令等体验优化为可选增强项。
+> 目标（一句话）：在前七阶段完成架构与运行时建设的基础上，**补齐模板内“基础设施能力族”和关键知识文档，搭建清晰的人类说明层，通过系统测试与 CI 把模板打磨到可复用、可信赖的工程资产水平，并为 Agent Runtime 提供良好的启动与使用体验**；斜杠命令等作为可选但高价值的体验增强，与 Agent Runtime 协同使用。
 
 ---
 
 ## 1. 阶段定位与总体目标
 
-### 1.1 在整体路线中的位置回顾
+### 1.1 在整体路线中的位置回顾 
 
-- **阶段 1–3**：搭建目录骨架、文档规范与核心机制说明（模块 / 能力 / 路由 / Hook）；  
-- **阶段 4–5**：实现注册写入脚本与脚手架（Scaffolding），让“新增模块 / 能力 / Route / Hook”有标准流程；  
-- **阶段 6**：用真实的小规模样本注册知识 / 能力 / Hook，验证脚手架工作；  
-- **阶段 7**：实现 Ability Runtime + Hook Runtime + 最小 Agent Runtime，使架构文档中“执行”和“联动”具备可运行实现。  
+- **阶段 1–3**：搭建目录骨架、文档规范与核心机制说明（模块 / 能力 / 内容路由 / Hook / 模块化规范）；  
+- **阶段 4–5**：实现注册写入脚本与脚手架（Scaffolding），让“新增模块 / 能力 / Route / Hook / 场景”有标准流程；  
+- **阶段 6**：用真实的小规模样本注册知识 / 能力 / Hook，验证脚手架工作闭环；  
+- **阶段 7**：实现 Agent Runtime + Tool Runner + Hook Runner，使架构文档中“执行”和“联动”具备可运行实现。  
 
-**阶段八**不再扩展新机制，而是三件事：
+**阶段八**不再增加新机制，而是聚焦三类工作：  
 
-1. **补内容**：补齐一组“基础设施能力族”和与模板强相关的知识文档；  
-2. **建说明层**：构建面向人类的 README / Handbook / 工具路由，让人可以快速理解模板整体情况与用法；  
-3. **建质量线**：用单测、契约测试、集成测试 + CI，把模板打磨到“可以放心复用”的稳定水平；示例（examples）来自这些测试过程中的正反面案例。  
+1. **补内容**：补齐一组与模板强相关的“基础设施能力族”和少量开发/调试辅助能力；  
+2. **建说明层**：构建面向人类的说明/索引文档，让人类有清晰的参与入口；  
+3. **建质量线**：通过单测/契约测试/集成测试 + CI + 示例，将模板打磨成可复用、可信赖的工程资产。  
 
-斜杠命令（如用于触发注册/脚手架的 `/.scaffold` 类命令）属于**可选增强**，在有余力时添加。
+同时，规划中还需要：  
 
-### 1.2 范围边界（做什么 / 不做什么）
-
-**本阶段重点：**
-
-- 只补充**基础设施能力族**（infra-oriented abilities），不扩展具体业务领域能力；  
-- 文档层重点是：**让人清晰理解架构与用法**，而不是详细重复 knowledge 下所有内容；  
-- 测试不只验证“能跑”，还要为“后续大量项目基于模板生成”打下可靠性基础；  
-- CI 流程纳入本阶段范围，成为质量线的一部分。  
-
-**本阶段不做：**
-
-- 不引入新的运行时机制 / 路由模型；  
-- 不追求覆盖所有潜在能力，只构建一组“高复用的 infra 能力族”；  
-- 不构建复杂 UI，只围绕 CLI + 文档层优化体验。  
+- 考虑 Agent Runtime 的**进程启动与使用方式**（dev 环境如何启动、如何连上外部 AI）；  
+- 为斜杠命令与 Agent Runtime 的结合预留接口（可选增强）。  
 
 ---
 
-## 2. 工作块 A：基础设施能力族与知识补全
+## 2. 工作块 A：基础设施能力族与开发/调试辅助能力补全
 
 ### 2.1 工作块目标
 
-> **为模板补齐一组与 repo 特性紧密相关的“基础设施能力族”与配套知识，使后续任何基于模板生成的项目，都能直接复用这些能力完成自检、自修与日常维护。**
+> **为模板补齐一组与 repo 特性紧密相关的“基础设施能力族”和少量“开发/调试辅助能力”，使后续任何基于模板生成的项目，都能直接复用这些能力进行自检、自修、测试与调试，尤其方便搭建 e2e 场景。**
 
-这里的“能力”限定为 infra 级别，服务于：
+### 2.2 能力族范围
 
-- 模板结构健康检查；  
-- registry/config/hooks/AGENTS 等元数据的一致性维护；  
-- 运行时自检；  
-- 测试与 CI 的辅助；  
-- 文档/索引的自动更新等。  
+维持“infra 优先”的定位，在此基础上略微扩展到与模板关系紧密的 dev/debug 场景。
 
-### 2.2 能力族范围（示例）
+#### 2.2.1 模板健康检查能力
 
-1. **模板健康检查能力**  
-   - 检查模块目录与 `modules/overview/*.yaml` 是否一致；  
-   - 检查 registry/config/hooks 中是否存在 dangling 引用；  
-   - 校验 AGENTS 中引用的 knowledge 文档是否存在。  
+- 检查模块目录与 `modules/overview/*.yaml` 是否一致；  
+- 检查 registry/config/hooks 中是否存在 dangling 引用；  
+- 校验 `AGENTS.md`、`ROUTING.md` 等文件引用的路径是否存在；  
+- 输出结构化“问题列表”，方便脚手架或 CI 使用。
 
-2. **结构 / 文档同步能力**  
-   - 根据 registry / MANIFEST 变化，自动更新：  
-     - 模块内 `AGENTS.md` 的能力列表片段；  
-     - 工具索引文档中某些列表段落；  
-   - 保证“代码 / 元数据 / 人类文档”三者尽量同步。  
+#### 2.2.2 结构 / 文档同步能力
 
-3. **运行时自检能力**  
-   - 检测 Ability Runtime / Hook Runtime 的基本可用性：  
-     - config 能否定位到脚本实现；  
-     - hook handler 是否可执行；  
-     - 在不触发真实业务副作用的前提下跑一轮 smoke test。  
+- 基于 registry / MANIFEST 变化，自动更新：  
+  - 模块内 `AGENTS.md` 的能力列表片段；  
+  - Tools / Runtime 概览文档中某些列表/表格段落；  
+- 确保“代码 / 元数据 / 人类说明文档”三者尽量一致。
 
-4. **测试与 CI 辅助能力**  
-   - 一键运行“模板测试套件”（见工作块 C）；  
-   - 收集最近一次测试执行结果，生成简要报告，帮助人快速定位问题。  
+#### 2.2.3 运行时自检能力
+
+- 对 Tool Runner / Hook Runner / Agent Runtime 做轻量自检：  
+  - config 能否找到实现脚本；  
+  - Hook handler 是否存在并可执行；  
+  - 在 dev 环境跑一轮 smoke test（不对外产生破坏性效果）。  
+
+#### 2.2.4 测试与 CI 辅助能力
+
+- 一键触发模板测试套件（见工作块 C）：  
+  - unit tests / contract tests / integration tests / scenario tests；  
+- 汇总最近一次测试结果，生成供人类阅读的 Test Summary（可用于 README 或 workdocs）。
+
+#### 2.2.5 开发与调试辅助能力（限模板工程侧）
+
+在不引入业务逻辑的前提下，补充少量与模板强绑定的开发/调试能力，方便 e2e 场景构建：
+
+- **后端开发/测试能力：**  
+  - `backend.run_unit_tests`：按模块/目录运行后端单测；  
+  - `backend.run_contract_tests`：对接口运行 contract tests；  
+  - `backend.run_integration_tests`：按 `modules/integration/scenarios.yaml` 中的场景运行集成测试；  
+  - `backend.start_local_service`：在 dev 环境拉起某服务（仅本地/非生产）。  
+
+- **前端开发/测试能力（如适用）：**  
+  - `frontend.run_unit_tests`：前端单测；  
+  - `frontend.run_lint`：前端 lint/format；  
+  - `frontend.build_bundle`：构建前端 bundle。  
+
+- **调试/诊断能力：**  
+  - `debug.collect_logs`：从日志镜像或 dev 环境收集指定服务的近期日志；  
+  - `debug.dump_env_info`：导出当前 dev 环境的关键信息（版本、特性开关、依赖状态）；  
+  - `debug.reproduce_scenario`：针对某个 integration scenario 复现一次失败路径（在测试环境）。  
+
+> 约束：以上能力仅在 dev/test 环境下可用，真正联动外部系统的行为仍应通过 DevOps 脚本/Hook 控制，避免 AI 直接操作生产环境。
 
 ### 2.3 实施方式与约束
 
-- 所有能力均通过**既有的能力生命周期与脚手架**落地：  
-  - 使用 Phase 5 的脚手架（new_ability_low/high）新增能力；  
+- 所有能力均应通过既有能力生命周期与脚手架落地：  
+  - 使用 Phase 5 的能力脚手架（new_ability_low/high）；  
   - 使用 Phase 4/6 的 registry/config 写入脚本完成注册；  
-  - 确保 Ability Runtime（Phase 7）可以执行。  
+  - 确保 Tool Runner 可以执行这些能力，并通过 Hook Runner 做 guard。  
 
 - 每个能力必须：  
   - 在 `.system/registry/low-level|high-level` 注册；  
   - 在 `.system/registry/config/abilities.yaml` 有执行配置；  
-  - 经过了至少一个相关测试用例（单测或集成测试）。  
-
-- 所有能力均为**模板 infra 能力**，不引入具体业务逻辑。  
+  - 在对应模块的 `ABILITY.md` 有说明；  
+  - 有至少一条测试覆盖（unit 或 integration）。  
 
 ---
 
-## 3. 工作块 B：面向人类的整体说明层（README / Handbook / 工具路由）
+## 3. 工作块 B：面向人类的说明层与“参与入口”
 
 ### 3.1 工作块目标
 
-> **为人类提供一层清晰、简明的说明层，使其在不深入阅读所有知识文档的情况下，仍能掌握模板的整体结构、理念与主要使用方式，并能对齐设计思路与需求。**
+> **构建一层面向人类的简明说明层，使非模板作者的人也能快速理解当前 repo 的整体结构、关键能力与 Hook 配置，从而更好参与检验与运维。**
 
-这一层主要解决：
+这里有两个侧重点：
 
-- “这是个什么模板？”  
-- “目录这么多，哪一块负责什么？”  
-- “如果我要做 X，要从哪里看/怎么开始？”  
+1. 让人类快速理解“这是个什么模板、怎么用”；  
+2. 让人类能看到**当前版本真实注册的 hooks / abilities / 脚手架等关键信息**，而不必阅读大量 YAML/MD。
 
-### 3.2 核心文档与职责分工
+### 3.2 README / Handbook / Tools 文档（整体说明）
 
-为避免重复维护，文档层采用“**少量入口 + 摘要 + 路由**”的策略：
+延续原有规划，对文档层保持“少而精”的结构：
 
-1. **根级 `README.md` —— 入门总览**  
-   - 职责：新读者的**第一眼**；  
-   - 内容重点：  
-     - 模板目标与典型使用场景；  
-     - 顶层目录结构简要说明（modules / .system / knowledge / PROJECT_INIT / ops …）；  
-     - “如果你是：”  
-       - 人类开发者：应先读哪些 AGENTS / Handbook / TOOLS 文档；  
-       - 外部 AI：应遵守哪些 AGENTS 规则 / 使用哪些脚本入口；  
-     - Quick Start：  
-       - **最少步骤跑一次模板自检 & 测试**；  
-       - 示例斜杠命令 / CLI 调用（若实现）。  
+1. **根级 `README.md`（入门总览）**  
+   - 说明项目模板的目标和使用场景；  
+   - 提供目录结构鸟瞰图；  
+   - 指出“人类第一次使用”和“外部 AI 第一次使用”应该看哪些文档。
 
-2. **Template Handbook（如 `docs/HANDBOOK.md` 或 `TEMPLATE_OVERVIEW.md`）**  
-   - 职责：对模板的**体系化讲解**；  
-   - 内容重点：  
-     - 核心目录与组件职责详细说明；  
-     - 模块 / 能力 / 路由 / Hook / Runtime / Scaffolding 的整体关系图；  
-     - 若干典型工作流：  
-       - 初始化项目；  
-       - 新增模块；  
-       - 新增能力 / Hook；  
-       - 跑 DevOps 脚手架；  
-     - 指向 knowledge 下的详细技术文档。  
+2. **Template Handbook（如 `PROJECT_INIT/HANDBOOK.md`）**  
+   - 系统化讲解：模块体系、运行时组件（Agent Runtime / Tool Runner / Hook Runner）、DevOps 目录（PROJECT_INIT/db/ops 等）；  
+   - 描述典型工作流（初始化项目、加模块、加能力/Hook、跑测试）。  
 
-3. **Tools & Abilities Overview（如 `TOOLS_OVERVIEW.md`）**  
-   - 职责：为人类提供“工具地图”；  
-   - 内容重点：  
-     - 按类别列出常用基础设施能力与脚本工具；  
-     - ability_id / 脚本入口 / 适用场景；  
-     - 与哪份知识文档关联（ability_routing / config / examples 等）。  
+3. **Tools & Abilities Overview（人类视角的工具地图）**  
+   - 以类别分组列出常用 infra 能力和 dev/debug 能力；  
+   - 每项只列：`ability_id`、一句话说明、调用入口（脚本/命令）；  
+   - 不重复 registry/ABILITY.md 的技术细节。
 
-4. **Tools Routing（如 `TOOLS_ROUTING.md`，可与上文合并）**  
-   - 职责：从“**人类任务**”到“**具体工具/脚手架**”的映射；  
-   - 示例：  
-     - “我要新增一个模块” → 查看某些文档 → 调用某脚手架命令；  
-     - “我要检查模板结构是否健康” → 调用某能力；  
-     - “我要为能力加 Hook 保护” → 查看 Hook 文档 + 脚手架。  
+4. **Tools Routing（需求→工具指引）**  
+   - 从“我要做 X”出发，指向相关 AGENTS / 能力 / 脚手架；  
+   - 例如，“新增模块”、“检查模板健康”、“为能力添加 Hook 保护”、“运行某个集成场景”等。  
 
-5. **Runtime & Hooks Overview（可为独立文档或 Handbook 章节）**  
-   - 职责：用人话解释运行时与 Hook 的协作关系；  
-   - 内容：  
-     - Ability Runtime / Hook Runtime / Agent Runtime 之间的数据流；  
-     - Hook 对 AI 行为的影响边界；  
-     - 外部 AI 如何通过命令行接口与 runtime 协作。  
+5. **Runtime & Hooks Overview**  
+   - 用人话解释：Agent Runtime / Tool Runner / Hook Runner 之间如何协作；  
+   - 哪些 Hook 会影响 AI 行为（PromptSubmit/PreAbilityCall + blocking），哪些只是日志/统计；  
+   - 外部 AI 和人类如何通过命令行或斜杠命令与 Agent Runtime 交互。
 
-### 3.3 避免重复的维护策略
+### 3.3 “人类参与入口”：运行时 & Hook 索引文档
 
-- 详细技术规范仍集中在 `knowledge/` 下；  
-- README / Handbook / TOOLS 层只做“摘要 + 链接路由”；  
-- 在 `DOCS_CONVENTION.md` 中明确：  
-  - 更新流程为“先改 knowledge 源文档，再由 AI 负责刷新摘要层文档”，人类只做审核。  
+除了以上整体说明，建议增加一份“面向运维/维护者的索引文档”，例如：  
+
+- `RUNTIME_REFERENCE.md` 或 `HUMAN_RUNTIME_OVERVIEW.md`  
+
+职责：
+
+1. **模块/场景总览（简略）**  
+   - 模块数量、重要 DevOps 场景（PROJECT_INIT/db/ops…）。  
+
+2. **能力清单（按类别）**  
+   - Infra 能力列表（健康检查/结构同步/自检/测试辅助）；  
+   - Dev/Debug 辅助能力列表（后端/前端/调试相关能力）；  
+   - 每项：`ability_id` + 一句话说明 + 调用入口（如 `tool_runner` 命令或斜杠协议）。  
+
+3. **Hook 清单**  
+   - 表格列出：`id / event_type / enabled / blocking / summary`；  
+   - 标注哪些 Hook 是 AI-facing + blocking 的（例如 PromptSubmit/PreAbilityCall + blocking=true）。  
+
+4. **脚手架与常用脚本**  
+   - 列出主要脚手架能力/命令（新增模块/能力/Hook/场景）；  
+   - 列出常用 Make 目标与 CI pipeline 入口。  
+
+> 目标：人类只要看这一份，就能快速了解当前 repo 的“运行时配置状态”，不必深入 YAML/代码。
+
+### 3.4 自动更新索引文档的脚本/能力
+
+为避免手动维护索引，Phase 8 中应实现一个**自动更新脚本**，可同时注册成一个能力，例如：
+
+- 脚本路径示例：`scripts/devops/update_runtime_reference.py`  
+- 对应能力：`runtime.update_human_overview`  
+
+行为：
+
+1. 扫描 `.system/hooks/*.yaml`：  
+   - 读取 `id / event_type / enabled / blocking / summary`；  
+   - 生成 Hook 概览表格（Markdown）。  
+
+2. 扫描能力 registry/config：  
+   - 读取已注册的能力（low-level/high-level），结合 config 中的分类信息（如 infra/dev/debug）；  
+   - 生成按类别分组的能力清单。  
+
+3. 可选：扫描脚手架脚本、Agent Runtime 的斜杠命令约定（见第 5 节），生成“常用命令”列表。  
+
+4. 更新 `RUNTIME_REFERENCE.md`：  
+   - 使用标记区（例如 `<!-- AUTO-GENERATED: HOOKS_TABLE_START -->` / `END`）来替换自动生成区域；  
+   - 保留人工维护的上下文说明和结构。  
+
+5. 集成：  
+   - 建议在 CI 中增加一步校验：  
+     - 运行 `update_runtime_reference`，若有 diff，提示开发者本地运行并提交更新；  
+   - 或由 AI 在合适的维护任务中主动调用该能力。
 
 ---
 
@@ -165,168 +198,188 @@
 
 ### 4.1 工作块目标
 
-> **为模板建立一套可靠的测试与 CI 体系，确保模板本身“没有明显 bug / 配置错误”，能够安全作为后续多个项目的起点；并为后续性能/可靠性优化与高级特性打下基础。**
+> **为模板建立可复用的测试与 CI 体系，保证模板本身“没有明显 bug / 配置错误”，并支持后续项目直接继承这条质量线。**
 
-### 4.2 测试维度与内容
+### 4.2 测试维度
 
 1. **单元测试（Unit Tests）**  
-   - 覆盖对象：  
-     - Registry 写入脚本（Phase 4）；  
-     - Ability Runtime（ability_runner / ability_lib）；  
-     - Hook Runtime（hook_runner）；  
-     - 核心基础设施能力脚本（工作块 A 中实现的能力）。  
-   - 目标：  
-     - 验证各模块在“理想输入 + 常见错误输入”下行为合理。  
+   - 覆盖：  
+     - registry 写入脚本；  
+     - Tool Runner（task.* 调度逻辑）；  
+     - Hook Runner（事件分发与 handler 调用）；  
+     - 核心 infra 能力和 dev/debug 能力。  
 
 2. **契约测试（Contract / Schema Tests）**  
-   - 覆盖对象：  
-     - registry / config / hooks 的 schema 与 cross-reference；  
-     - AGENTS 中的关键引用（例如指向 knowledge 文档路径）。  
-   - 目标：  
-     - 确保仓库中所有 YAML / 配置在结构上合法；  
-     - 不存在明显的 dangling 引用或关键漏项。  
+   - 验证：  
+     - 所有 registry/config/hooks YAML 满足各自 schema；  
+     - 所有跨引用（ability ↔ hooks ↔ scripts、AGENTS ↔ knowledge 路径）不存在明显 dangling。  
 
 3. **集成测试（Integration Tests）**  
-   - 示例场景：  
-     - “新增能力 → 注册 → Runtime 调用 → Hook 触发 → 记录”的完整链路；  
-     - “新增 Hook → guard/telemetry 生效”的链路；  
-     - “脚手架新增模块 → registry / 目录 / AGENTS 一致”的链路。  
-   - 目标：  
-     - 验证前七阶段搭建的各层协同正常工作。  
+   - 覆盖典型完整链路：  
+     - “新增能力 → 注册 → Tool Runner 调用 → Hook 生效”；  
+     - “新增 Hook → 能力调用时生效 Guard/审计”；  
+     - “脚手架 → 注册 → Runtime 调用”闭环。  
 
-4. **稳定性 / 性能基本线（轻量）**  
-   - 适度测试例如：  
-     - 多次并发调用简单能力，观察是否有资源泄漏或明显性能退化；  
-     - 批量运行 registry/config 校验，确保在合理时间内完成。  
-   - 重点不是极致优化，而是避免明显性能坑和不稳定点。  
+4. **场景测试（Scenario / Golden Tests）**  
+   - 针对特定 integration scenario（例如简单 e2e 流程）构建“黄金流程”：  
+     - 保证在模板演进时核心路径不会被破坏；  
+     - 在 `knowledge/examples` 中记录这些流程作为正向示例。
+
+5. **轻量性能 / 稳定性测试**  
+   - 对一些核心路径（如 Tool Runner 批量调用、Hook Runner 大量无匹配 Hook 情况）做简单压力/稳定性测试，避免明显的性能/资源问题。
 
 ### 4.3 CI 集成
 
-将测试流程纳入模板自身的 CI（例如 GitHub Actions / GitLab CI 等），包括：
+- 为模板仓库增加 CI pipeline：  
+  - 安装依赖；  
+  - 运行 unit + contract tests；  
+  - 运行关键 integration / scenario tests；  
+  - 可选：运行 `update_runtime_reference` 并比对是否有未提交变更。  
 
-- 安装依赖；  
-- 运行单元测试；  
-- 运行契约 / schema 测试；  
-- 运行关键集成测试；  
-- 在 README / Handbook 中说明 CI 状态与如何在本地重现。  
-
-**完成标准（测试与 CI 块）：**
-
-- 模板仓库本身有一套可运行的 CI 配置；  
-- 所有核心测试在 CI 中通过；  
-- 新项目基于模板生成时，可以继承这套 CI 配置作为默认质量线。  
+- CI 应该默认阻止在测试未通过的情况下合并变更；  
+- 后续项目 clone 模板时可以直接继承这套 CI 配置作为默认质量线。
 
 ---
 
-## 5. 工作块 D：Examples 作为“经验知识”的沉淀
+## 5. 工作块 D：Examples 作为经验知识库
 
 ### 5.1 工作块目标
 
-> **将测试与实战过程中遇到的典型情况（包括成功案例和失败/坑案例）沉淀为知识文档，帮助未来的使用者理解“如何正确使用模板”以及“常见陷阱”。**
+> **将测试与实战过程中遇到的典型情况（正例与反例）沉淀为知识文档，帮助 AI 与人类在未来快速理解“正确用法”和“常见陷阱”。**
 
 ### 5.2 形式与落点
 
-- 在 `knowledge/examples/` 或 `knowledge/architecture/examples/` 下建立案例文档，例如：  
-  - `example_add_ability_success.md`：记录一次顺利新增能力的流程与关键设计点；  
-  - `example_hook_guard_pitfall.md`：记录某次 Hook 配置错误导致问题的案例，以及后续修复方案；  
-  - `example_scaffolding_misuse.md`：记录脚手架误用场景与正确用法对比。  
+- 在 `knowledge/examples/` 下维护若干案例文档：  
+  - 正例：某种能力/Hook/脚手架使用得很顺畅的 e2e 流程；  
+  - 反例：某次配置错误或设计问题导致的 bug 及其修复。  
 
-- 每个案例文档包括：  
-  - 背景（需求 / 场景）；  
-  - 操作步骤（可引用对应 tests / workdocs）；  
-  - 正面/负面结果；  
-  - 教训与推荐实践；  
-  - 相关的能力 / Hook / 脚手架 / 测试链接。  
+- 每个案例文档包含：  
+  - 背景描述（关联的模块/能力/Hook/场景）；  
+  - 操作步骤（可加上链接到相关 tests 和 workdocs 任务）；  
+  - 问题与解决方案（若是反例）；  
+  - 推荐实践与“以后应该怎么做”。  
 
-### 5.3 与测试的关系
+### 5.3 与测试/CI 的关系
 
-- 每一个 integration / scenario 测试都可以对应一个 example 文档；  
-- 当测试发现 bug 并修复后，应同步补充一个“负例 -> 正例”的 case，帮助未来使用者避免重蹈覆辙。  
-
-**完成标准（Examples 块）：**
-
-- 存在若干具有代表性的正/反例案例文档；  
-- 案例与测试/脚手架/能力之间有互相引用，构成“经验网络”。  
+- 每一个 scenario test / golden test 对应至少一个案例文档；  
+- 反向：当发现一个严重问题时，应：  
+  - 写测试用例防止回归；  
+  - 写 example 文档记录教训与推荐实践。
 
 ---
 
-## 6. 工作块 E：斜杠命令与体验优化（可选增强）
+## 6. 工作块 E：斜杠命令与 Agent Runtime 结合（可选增强）
 
 ### 6.1 工作块目标
 
-> **在不影响核心设计的情况下，为常用操作提供便捷入口（斜杠命令 / Make 目标 / CLI 别名），降低人类与外部 AI 的使用门槛。**
+> **提供一套轻量、统一的“斜杠命令协议”，作为人类与外部 AI 使用 Agent Runtime 的友好入口，同时保持架构的一致性与可控性。**
 
-注意：本块为**非必选**，优先级低于 A–D。当资源不足时可以整体推迟。
+### 6.2 斜杠命令的三层分解
 
-### 6.2 建议的最小集合（若实施）
+1. **表示层（Representation）**  
+   - 在对话/编辑器中，以 `/.*` 形式表达常见操作，例如：  
+     - `/.scaffold module <module_id>`  
+     - `/.run ability <ability_id> [--json <payload>]`  
+     - `/.inspect hooks`  
 
-1. **推荐斜杠命令集合（约定层）**  
-   - `/.scaffold module` —— 建议执行“新增模块”脚手架；  
-   - `/.scaffold ability` —— 新增 infra 能力（AI 再问 low/high 等细节）；  
-   - `/.scaffold hook` —— 新增 Hook 注册；  
-   - `/.run ability <id>` —— 通过 Ability Runtime 执行能力；  
-   - `/.inspect registry` —— 调用 introspection 能力查看当前 registries 状态。  
+2. **协议层（Protocol → Agent Runtime Action）**  
+   - 斜杠命令解析后，对应到一组 Agent Runtime 的动作原语：  
+     - 如 `/.run ability A` → `CREATE_TASK(A)` + `RUN_TASK(task_key)`；  
+     - `/.scaffold module` → 调用脚手架能力。  
 
-   这些可以先作为**对话中的约定表达**写进 AGENTS.md，即便暂时没有完全对应的 CLI。
+3. **执行层（Execution）**  
+   - Agent Runtime 收到解析后的 Action 列表：  
+     - 调用 Tool Runner / Hook Runner；  
+     - 更新 session 状态 / workdocs；  
+     - 返回结果给外部 AI / 人类。  
 
-2. **可执行 CLI / Make 目标（实现层，若有）**  
-   - 在 `scripts/cli/` 或根 `Makefile` 中为上述操作提供 wrapper：  
-     - 如 `make scaffold-module` → 调用 `scripts/scaffold/new_module.py`；  
-     - 如 `make run-ability ABILITY_ID` → 调用 `ability_runner`。  
+> Tool Runner 与 Hook Runner **不理解斜杠命令**，只接受结构化动作。斜杠协议由 Agent Runtime 层解析并执行。
 
-3. **文档说明**  
-   - 在根 README / Tools Routing 文档中标出这些斜杠命令 / make 目标；  
-   - 说明这些命令是“推荐用法”，但不是使用模板的前置条件。  
+### 6.3 在文档中的表现形式
 
-**完成标准（体验块）：**
+- 在根 `AGENTS.md` 中增加路由指向一个专门的文档，在其中定义“斜杠命令语法 + 语义”：  
+  - 描述每条斜杠的含义、对应的 Agent Runtime 动作以及适用/禁用场景；  
+  - 明确哪些命令只可用于 dev/test，哪些需要人工确认。  
 
-- 若有实施：常用操作有清晰的快捷命令，并在文档中说明；  
-- 若未实施：仍有一份“推荐斜杠命名规范”记录在 AGENTS / 文档中，为后续增强预留空间。  
+- Agent Runtime 对外暴露一个统一的 `slash_command` 接口：  
+  - 如 HTTP：`POST /slash_command`；  
+  - 或 CLI：`agent_runtime slash "/.run ability A" --session S-123`。  
 
----
+- 可以在 `RUNTIME_REFERENCE.md` 中自动生成一节 “Supported Slash Commands”，方便人类查看。
 
-## 7. 人 / AI 分工与工作方式
-
-| 工作块 | 目标 | AI 主要职责 | 人类主要职责 |
-|--------|------|-------------|--------------|
-| A：基础设施能力族 & 知识 | 补齐与模板强相关的 infra 能力和知识 | 根据需求草案设计能力、通过脚手架实现并注册、起草知识文档 | 决定优先能力类别、审查设计边界与实现质量 |
-| B：人类说明层 | 构建 README / Handbook / Tools 路由 | 起草文档结构与内容、维护摘要层与 knowledge 链接 | 调整结构与措辞，确保易读和符合设计意图 |
-| C：测试 & CI | 打造模板质量线 | 编写单元/契约/集成测试、生成 CI 配置草案 | 选择关键场景、设置通过标准、验证实际 CI 行为 |
-| D：Examples 知识化 | 把测试中经验沉淀为案例 | 从测试与 workdocs 中抽取案例并成文 | 选择有代表性的正/反例，补充背景与判断 |
-| E：斜杠命令（可选） | 提升使用体验 | 设计命令协议与部分脚本实现 | 决定是否实施、确定命名风格与默认入口 |
-
-工作方式延续前几阶段：**“AI 写 / 人审 / AI 改”**，人类尽量不手写长文档或大段代码，而是集中在：
-
-- 决策优先级与边界；  
-- 做关键路径的集成测试与体验验证；  
-- 挑出能沉淀为 example 的典型场景。  
+> 斜杠命令本身为可选特性，但建议在模板中预留接口与文档结构，后续视项目需要逐步实现。
 
 ---
 
-## 8. 阶段八完成判定标准（Definition of Done）
+## 7. Agent Runtime 的进程启动与使用体验
+
+### 7.1 工作块目标
+
+> **让 Agent Runtime 作为唯一常驻进程的启动和使用方式清晰可控，便于在本地开发和 CI 环境中快速启动并接入外部 AI。**
+
+### 7.2 启动方式与命令
+
+在模板中应提供统一的启动方式，例如：
+
+- CLI 命令：  
+  - `scripts/runtime/start_agent_runtime.py` 或  
+  - `make agent-runtime`（封装启动）  
+
+- 启动参数：  
+  - 端口 / 监听模式（HTTP/RPC）  
+  - 运行环境（dev/test）  
+  - 外部 AI 连接方式（如通过某个代理/桥接）  
+
+在 Handbook / Runtime Overview 中需要说明：
+
+- 如何在本地启动 Agent Runtime；  
+- 如何确认其健康状态（例如 healthcheck endpoint）；  
+- 外部 AI 或开发者如何连接到它（例如 API 地址、认证方式）。
+
+### 7.3 与 CI / 自动化的关系
+
+- 在 CI 环境下可以选择：  
+  - 启动一个简化版 Agent Runtime，仅用于运行 scenario tests；  
+  - 或仅使用 Tool Runner 与 Hook Runner，而不必启动 Agent Runtime（针对纯非交互场景）。  
+
+- 策略：  
+  - 若 CI 偏重“模拟真实使用”，建议在 pipeline 中临时启动 Agent Runtime，运行少量回归场景；  
+  - 若 CI 偏重快速验证核心逻辑，可以只调用 Tool Runner + Hook Runner，省略 Agent Runtime。
+
+### 7.4 策略文档中的说明
+
+- 在根 `AGENTS.md` 中应：  
+  - 明确 Agent Runtime 是“唯一常驻协调器”；  
+  - 建议外部 AI 只通过 Agent Runtime 的接口来操作 repo（避免直接绕过 Tool Runner / Hook Runner）；  
+  - 对 CI/cron 直接调用 Tool Runner 的场景给出范围与注意事项。
+
+---
+
+## 8. 完成判定（DoD）
 
 当满足以下条件时，可认为 Phase 8 已完成：
 
-1. **基础设施能力族已补齐**  
-   - 至少一组与模板强相关的能力（健康检查 / 结构同步 / 运行时自检 / 测试辅助等）被完整实现并注册；  
-   - 这些能力可通过 Ability Runtime 调用，并在相关模块的 ABILITY 文档中有说明；  
-   - 相关能力有对应测试覆盖。  
+1. **能力与知识层**：  
+   - 基础设施能力族和少量 dev/debug 能力已实现并注册，可通过 Tool Runner 调用；  
+   - 核心知识域（architecture / modules template / devops / scaffolding / runtime）有对应知识文档，并在 AGENTS/ROUTING 中被引用。  
 
-2. **面向人类的说明层清晰易用**  
-   - 根级 README、Template Handbook、Tools Overview / Routing 等文档存在且结构合理；  
-   - 新人只通过这些文档即可理解模板整体情况和主要用法。  
+2. **人类说明层**：  
+   - 根 README + Handbook + Tools/Runtime 概览文档存在且结构清晰；  
+   - 至少有一份“运行时 & Hook 索引”文档（如 RUNTIME_REFERENCE.md），其中部分区域由脚本自动维护。  
 
-3. **测试与 CI 构成可复用的质量线**  
-   - 模板仓库具备完善的单测 / 契约测试 / 针对关键路径的集成测试；  
-   - CI 流程集成这些测试并稳定通过；  
-   - 模板被设计为后续项目可直接继承这套 CI 作为默认质量线。  
+3. **测试与 CI**：  
+   - 模板仓库通过单元、契约、关键集成与场景测试；  
+   - CI pipeline 集成这些测试并默认阻止测试失败的合并。  
 
-4. **Examples 形成经验知识库**  
-   - 测试与实战过程中的若干正/反例已沉淀为 `knowledge/examples` 下的案例文档；  
-   - 每个例子都能关联到对应测试 / 能力 / Hook / 脚手架，帮助使用者避免常见坑。  
+4. **Examples**：  
+   - 有若干正/反例案例文档与对应的 tests/workdocs 关联，形成可供 AI 和人类参考的经验库。  
 
-5. **斜杠命令（若实施）有合理说明**  
-   - 若实现：常用操作有清晰的 CLI/斜杠命令封装，并在 README / AGENTS 中说明；  
-   - 若暂未实现：仍有一套推荐命令/约定在文档中记录，留待后续增强。  
+5. **斜杠命令与 Agent Runtime（如实施）**：  
+   - 斜杠命令规范与 Agent Runtime 的 slash 接口定义清晰；  
+   - 至少支持若干基础命令（如 scaffold、run ability、inspect hooks），并在文档中有说明。  
 
-达到以上标准后，repo 模板即进入“稳定可复用”的状态，后续迭代可以围绕具体项目需求，按需扩展能力、适配业务领域，并在不破坏模板质量线的前提下引入更多高级特性（异步 Hook、复杂 DevOps 集成等）。
+6. **Agent Runtime 启动与使用体验**：  
+   - 本地环境下一条命令即可启动 Agent Runtime，并在文档中清楚说明接入方式；  
+   - 在 CI/自动化场景下，Agent Runtime 与 Tool Runner/Hook Runner 的使用路径与策略已被明确。  
+
+当这些目标达到时，repo 模板不仅“结构完整、机制齐全”，而且**能力丰富、文档友好、质量可控**，既适合 AI 深度参与，也为人类的检验与运维提供了清晰入口。  

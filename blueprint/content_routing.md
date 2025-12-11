@@ -2,7 +2,7 @@
 
 ## Roles & Terms
 
-This document follows the shared glossary defined in the same directory's README (`AI developer`, `internal orchestration`, `runtime`, `hook layer`, and `humans`). It uses those terms as defined there and does not introduce additional role names.
+This document follows the shared glossary defined for AI-facing docs in this repository (for example, the project-level `AGENTS.md` and any shared glossary it references). It uses the standard terms `AI developer`, `Agent Runtime`, `Tool Runner`, `Hook Runner`, and `humans` as defined there and does not introduce additional role names.
 
 This document defines the **knowledge routing** system used to help an AI development assistant reliably find and load the right documentation during task execution.
 
@@ -415,7 +415,7 @@ To keep knowledge routing reliable and evolvable over time, combine **automated 
 
    - **Metadata completeness**
      - All knowledge documents include front matter with required fields (e.g., `id`, `scope`, `doc_type`, `summary`).
-     - All routing documents (`ROUTING.md` and `/routes/*.yaml`) conform to the structure defined in this README.
+     - All routing documents (`ROUTING.md` and `/routes/*.yaml`) conform to the structure defined in this specification.
 
    - **Routing consistency**
      - Each `route_indexes.route_file` exists and is readable.

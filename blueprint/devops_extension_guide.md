@@ -2,7 +2,7 @@
 
 ## Roles & Terms
 
-This guide follows the shared glossary defined in the same directory's README (`AI developer`, `internal orchestration`, `runtime`, `hook layer`, and `humans`). It uses those terms as defined there and does not introduce additional role names.
+This guide follows the shared glossary defined for AI-facing docs in this repository (for example, the project-level `AGENTS.md` and any shared glossary it references). It uses the standard terms `AI developer`, `Agent Runtime`, `Tool Runner`, `Hook Runner`, and `humans` as defined there and does not introduce additional role names.
 
 ## 1. Purpose & Scope of This Guide
 
@@ -28,6 +28,7 @@ For each DevOps-focused directory, it is recommended to add a short, local `AGEN
 - Scope boundaries for the scenario (what is in/out of scope for the AI developer).
 - Which scripts are safe to propose or run automatically.
 - Where human approval is required (for example, production changes or destructive operations).
+- How this area expects to interact with the Agent Runtime, Tool Runner, and Hook Runner (for example, which abilities or hooks are relevant).
 
 Typical locations include:
 
@@ -36,16 +37,16 @@ Typical locations include:
 - `/ops/packaging/AGENTS.md`
 - `/ops/deploy/AGENTS.md`
 
-These local strategy docs extend the global guidance described in `agents_strategy_guide.md` and the modular specification, without redefining roles.
+These local strategy docs extend the global guidance described in `agents_strategy_guide.md` and the modular specification, without redefining roles. Human-facing `README.md` files in these directories are intended for humans only; AI systems should follow the corresponding `AGENTS.md` instead of inferring behavior directly from `README.md`.
 
 
 All extended scenarios in this guide share several common principles.
 
 ### 2.1 AI-first, human-supported
 
-- AI is the primary executor for routine work inside the repository boundaries.
+- AI is the primary executor for routine work inside the repository boundaries, typically running as an **external AI client** (such as Cursor, Claude, or other tools) that talks to the project’s Agent Runtime instead of embedding itself into the repo as a long-running process.
 - Humans provide project knowledge, constraints, and approvals, and execute sensitive operations when necessary.
-- The repository structure is designed so that AI can discover what it needs from files and directories, without hidden, out-of-band knowledge.
+- The repository structure is designed so that AI can discover what it needs from files and directories, without hidden, out-of-band knowledge. AI systems should follow `AGENTS.md` and ability/knowledge routing docs; human-facing `README.md` files are for human operators configuring or supervising these flows.
 
 ### 2.2 Scenario-local workspaces
 
@@ -274,7 +275,7 @@ Packaging-related configuration and scripts should be separated from business co
   scripts/       # Shared scripts or commands to build artifacts
   workdocs/      # Scenario-local workspace for packaging plans and records
 ```
-Each packaging definition should indicate which module instance and, where applicable, which interface it packages. For example, a service entry can reference a `module_id` from `modules/overview/instance_registry.yaml` and an interface from `modules/overview/interfaces.yaml`. Module-level `docs/README.md` files are encouraged to link back to the corresponding entries under `/ops/packaging/` so that AI and humans can navigate between module code and packaging configuration.
+Each packaging definition should indicate which module instance and, where applicable, which interface it packages. For example, a service entry can reference a `module_id` from `modules/overview/instance_registry.yaml` and an interface from `modules/overview/interfaces.yaml`. Module-level `docs/README.md` files are encouraged to link back to the corresponding entries under `/ops/packaging/` so that humans can navigate between module code and packaging configuration. For AI systems, the corresponding module- or ops-level `AGENTS.md` should point to the same packaging entries and explain how to use them safely.
 
 
 Principles:

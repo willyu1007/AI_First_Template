@@ -4,14 +4,14 @@
 
 ### Roles & Terms
 
-This document follows the shared glossary defined in the same directory's README (`AI developer`, `internal orchestration`, `runtime`, `hook layer`, and `humans`). It uses those terms as defined there and does not introduce additional role names.
+This document follows the shared glossary defined for AI-facing docs in this repository (for example, the project-level `AGENTS.md` and any shared glossary it references). It uses the standard terms `AI developer`, `Agent Runtime`, `Tool Runner`, `Hook Runner`, and `humans` as defined there and does not introduce additional role names.
 
 Ability routing is the infrastructure that makes it easy for an AI-first project to reuse existing tools instead of “reinventing the wheel”, while keeping the code base transparent, consistent, and controllable.
 
 In this template:
 
 - An **ability** is a packaged piece of functionality that can be invoked by an AI or a human.
-- The project maintains a **single ability pool** and a **standard execution script** so that the AI can discover, validate, and call abilities in a uniform way.
+- The project maintains a **single ability pool** and a **standard Tool Runner** so that abilities can be discovered, validated, and called in a uniform way.
 - Abilities are split into **low-level** and **high-level** layers to keep orchestration manageable and to align with how a code model plans and executes work.
 
 The core design goals are:
@@ -19,7 +19,7 @@ The core design goals are:
 1. **Maximize AI development efficiency**: the AI should be able to quickly discover and apply the right abilities for a given task, without reading large amounts of implementation code.
 2. **Keep orchestration manageable**: the orchestration logic should remain at an abstract level while low-level details are encapsulated behind well-defined abilities.
 3. **Support continuous evolution**: as the project grows and the AI generates new scripts and flows, the ability routing system should absorb these outputs and evolve with real usage.
-4. **Maintain control and safety**: all calls go through a common execution script with guardrails, logging, and configuration, so that behavior is auditable and adjustable.
+4. **Maintain control and safety**: all ability executions go through a common Tool Runner and Hook Runner with configuration and hooks, so that behavior is auditable and adjustable.
 
 ---
 
@@ -43,7 +43,7 @@ In normal development, the AI’s working scope is well-defined, so one orchestr
 - Module-level `ABILITY.md` for feature development and local testing.
 - Integration-level `ABILITY.md` for end-to-end or cross-module testing.
 
-Routing documents evolve together with the project. When the AI’s orchestration hits gaps (for example, no ability exists for a common operation), the execution script and CI tools capture that usage and feed it back to improve `ABILITY.md` over time.
+Routing documents evolve together with the project. When the AI’s orchestration hits gaps (for example, no ability exists for a common operation), the Agent Runtime, Tool Runner, and CI tools capture that usage and feed it back to improve `ABILITY.md` over time.
 
 #### High-level vs. Low-level Abilities in `ABILITY.md`
 
@@ -73,7 +73,7 @@ A typical `ABILITY.md` may describe high-level abilities in a table form:
 
 Key fields:
 
-- `Id`: unique ability identifier used by the execution script.
+- `Id`: unique ability identifier used by the Tool Runner and Agent Runtime.
 - `Type`: `workflow` or `agent`.
 - `Scope`: domain or module where this ability is valid.
 - `When to use`: natural-language intent description to help semantic matching.
@@ -107,9 +107,9 @@ Routing documents should stay compact and focused on what is actually useful in 
 The project maintains a centralized **ability pool** – a set of all registered abilities that are allowed to be called. The ability pool is the single source of truth for:
 
 - What the ability is supposed to do.
-- How to call it (through the common execution script).
+- How to call it (via the Tool Runner task interface).
 - Where the implementations live.
-- Which configuration and guardrails apply.
+- Which configuration and hook bindings apply.
 
 We distinguish between **low-level abilities** and **high-level abilities**.
 
@@ -172,7 +172,7 @@ Maintenance example (conceptual):
   - Endpoints: `/charge`, `/refund`, `/invoice`
   - Rate limits: per minute and per day
 
-In all cases, the AI should not call these implementations directly. Instead, it calls the **standard execution script**, which loads configuration, applies guardrails, and executes the correct implementation for the selected operation key.
+In all cases, the AI should not call these implementations directly. Instead, it uses the **Agent Runtime**, which calls the **Tool Runner** to load configuration, run hooks (via the Hook Runner), and execute the correct implementation for the selected operation key.
 
 #### 1.2.2 High-level abilities
 
@@ -213,7 +213,7 @@ Example (conceptual):
   - `api.query.logs`
   - ...
 
-In both cases, high-level abilities are executed via the same **standard execution script**, not by the AI calling low-level tools directly.
+In both cases, high-level abilities are executed via the same **Tool Runner** (behind the Agent Runtime in interactive flows), not by the AI calling low-level tools directly.
 
 ---
 
@@ -223,7 +223,7 @@ Routing documents (`ABILITY.md`) **do not** contain full technical specification
 
 - Input and output contracts.
 - Scope and usage conditions.
-- Constraints and guardrails.
+- Constraints and hook bindings.
 - Mapping to implementations and configuration.
 
 Registries are the **single source of truth** (SSOT) for ability semantics. The AI uses routing documents to **find** abilities and registry entries to **understand and safely call** them.
@@ -238,7 +238,7 @@ The main question for the AI at orchestration time is:
 
 > “Can this operation type be inserted into my execution chain?”
 
-The execution script will then choose a concrete implementation based on configuration and environment.
+The Tool Runner will then choose a concrete implementation based on configuration and environment.
 
 ##### Primary registry contents (operation-level)
 
@@ -272,9 +272,9 @@ Example of operation-level metadata (conceptual):
 - Output:
   - `status` (`success` | `error`)
   - `error_code` (optional)
-- Guardrail:
-  - Forbid `prod` environment unless explicitly whitelisted.
-  - Ensure emails look synthetic in staging/non-prod.
+- Ability-level hooks (conceptual example):
+  - Pre-call hooks that forbid `prod` environment unless explicitly whitelisted.
+  - Pre-call hooks that ensure emails look synthetic in staging/non-prod.
 
 ##### Implementation documents
 
@@ -315,9 +315,9 @@ For each operation key, the typical fields:
   - Referenced `ABILITY.md` paths
 - Hooks
   - `matcher` configuration
-  - `guardrail` configuration (e.g. rate limits, environment checks)
+  - Ability-level hook bindings referenced from registry/implementation documents (for example, `hooks.pre_call` / `hooks.post_call`)
 
-The AI interacts with configuration only indirectly via the execution script. The script is responsible for interpreting configuration and selecting the correct implementation.
+The AI interacts with configuration only indirectly through the Agent Runtime and Tool Runner. The Tool Runner is responsible for interpreting configuration, resolving hook bindings, and selecting the correct implementation.
 
 #### 1.3.2 High-level Ability Registry
 
@@ -329,7 +329,7 @@ The AI must answer:
 
 > “Can I apply this ability to cover part of my development plan?”
 
-Again, the AI calls the standard execution script with the ability id; the script then executes the orchestrated flow.
+Again, the AI interacts with the Agent Runtime using the ability id; the Agent Runtime then uses the Tool Runner to execute the orchestrated flow.
 
 ##### Primary registry contents
 
@@ -376,7 +376,7 @@ Each high-level abilities also has configuration documents. Example fields:
   - Tags (e.g. `critical`, `unsafe-in-prod`, `slow`)
 - Hooks
   - `matcher`: matching rules to surface this ability to the AI
-  - `guardrail`: guardrails that wrap the entire high-level flow
+  - Ability-level hook bindings (for example, `hooks.pre_call` / `hooks.post_call`) that wrap the entire high-level flow via PreAbilityCall/PostAbilityCall events
 
 ---
 
@@ -386,7 +386,7 @@ High-level and low-level abilities form a single, unified tool pool. Ability rou
 
 ### 2.1 Task Orchestration Perspective
 
-From the AI developer’s internal orchestration perspective, the typical process is:
+From the AI developer’s internal orchestration perspective (working through the Agent Runtime in interactive sessions), the typical process is:
 
 1. **Identify the correct `ABILITY.md`**
    - Based on the current working scope (module or integration).
@@ -396,19 +396,19 @@ From the AI developer’s internal orchestration perspective, the typical proces
    2. For each candidate, follow the `Registry path` and read the high-level registry to check:
       - Input/output compatibility with the plan.
       - Environmental constraints.
-   3. Call the execution script to create a “use ability” task with the planned input.
-   4. If the ability is available, the script returns a task key; record this in the orchestration graph.
+  3. Issue a `CREATE_TASK`-style action to the Agent Runtime with the planned input so that it can create a “use ability” task via the Tool Runner.
+  4. If the ability is available, the Agent Runtime returns a task key; record this in the orchestration graph.
    5. Repeat until all high-level candidates are evaluated.
 3. **Fill remaining gaps with low-level abilities**
-   - For plan steps not covered by high-level abilities, scan low-level abilities in `ABILITY.md`.
-   - Match operation keys and summaries to the remaining functional gaps.
-   - For each candidate, read the low-level registry entry and create a task via the execution script.
+  - For plan steps not covered by high-level abilities, scan low-level abilities in `ABILITY.md`.
+  - Match operation keys and summaries to the remaining functional gaps.
+  - For each candidate, read the low-level registry entry and ask the Agent Runtime to create a task via the Tool Runner.
 4. **Finalize the execution chain**
-   - Construct a full execution graph from the selected abilities and task keys.
-   - Ensure dependencies and ordering are consistent with the plan.
+  - Construct a full execution graph from the selected abilities and task keys.
+  - Ensure dependencies and ordering are consistent with the plan.
 5. **Execute according to the plan**
-   - Invoke the execution script using task keys at the right time.
-   - React to success/failure outputs and adjust the orchestration if needed.
+  - Ask the Agent Runtime to run tasks (which calls the Tool Runner with the task keys) at the right time.
+  - React to success/failure outputs and adjust the orchestration if needed.
 
 #### Key points and example
 
@@ -428,7 +428,7 @@ Example scenario:
     - `http.call.signup_service` for API calls.
     - `mcp.query.logs` to validate no errors.
 - Execution:
-  - For each ability, create a task via the execution script.
+  - For each ability, create a task via the Agent Runtime and Tool Runner.
   - Use the returned keys to build the execution chain.
 
 ### 2.2 Ability Routing Perspective
@@ -437,16 +437,16 @@ From the ability routing perspective, once the AI knows what it wants to do, the
 
 1. The AI reads the relevant `ABILITY.md` and selects a set of candidate registry paths.
 2. The AI reads the corresponding registry entries to decide which abilities to use.
-3. For each selected ability, the AI calls the execution script to **create a task** and receives a task key.
+3. For each selected ability, the AI asks the Agent Runtime to **create a task** (which uses the Tool Runner) and receives a task key.
 4. The AI builds its orchestration plan around those task keys.
-5. When it is time to execute, the AI calls the execution script with the task key.
-6. The execution script runs the underlying implementation(s) and returns outputs in the registered format; the AI continues the workflow.
+5. When it is time to execute, the AI asks the Agent Runtime to run the task using the task key.
+6. The Tool Runner runs the underlying implementation(s) and returns outputs in the registered format; the AI continues the workflow.
 
 #### Key points and example
 
 - `ABILITY.md` is an **index**, not a detailed spec.
 - Registries are **specs**, not execution engines.
-- The execution script is the **only** entry point for actually running abilities.
+- The Tool Runner is the **only** execution entry point for actually running abilities. Interactive AI sessions reach it indirectly through the Agent Runtime; background flows such as CI/cron may call it directly, subject to policy.
 
 Example:
 
@@ -459,25 +459,25 @@ Example:
   - Receives task key `task-123`.
   - Later calls `ability task.run` with key `task-123` to execute.
 
-### 2.3 Standard Execution Script
+### 2.3 Tool Runner (standard ability executor)
 
-The template provides a **single, global execution script** (or entry point) for abilities. The AI only needs to interact with this script, not with individual scripts, MCP tools, or APIs directly.
+The template provides a **single, global Tool Runner** (library and/or CLI) as the execution entry point for abilities. In interactive sessions, external AI systems normally call the Agent Runtime, which in turn uses the Tool Runner instead of calling individual scripts, MCP tools, or APIs directly. In background contexts (CI, cron, admin CLIs), it is acceptable to call the Tool Runner directly, subject to project policy.
 
-The execution script must:
+The Tool Runner must:
 
 - Provide a **uniform interface** for:
   - Creating tasks.
   - Executing tasks.
   - Querying and updating task payloads.
   - Deleting tasks when finished.
-- Enforce **guardrails** and validate **preconditions** before execution.
+- Enforce **hook-based guardrails** and validate **preconditions** before execution.
 - Apply **configuration and default parameters** automatically.
 - **Record usage** and outcomes to help improve routing documents and registries.
 - Promote **simplicity** for the AI: the AI can think in terms of ability ids and operation keys, not runtime details.
 
 #### Interfaces
 
-The execution script exposes at least the following conceptual interfaces:
+The Tool Runner exposes at least the following conceptual interfaces:
 
 1. **Create task** *(does not execute)*
    - Input:
@@ -485,7 +485,8 @@ The execution script exposes at least the following conceptual interfaces:
      - Structured input payload according to the registry.
    - Behavior:
      - Validates input against registry.
-     - Checks guardrails (environment, rate limits, manual approval, etc.).
+     - Resolves configuration and ability-level hook bindings (`hooks.pre_call` / `hooks.post_call`).
+     - Triggers `PreAbilityCall` hooks via the Hook Runner (including both global and ability-specific hooks).
      - If not executable, returns “unavailable” with reason.
      - If executable, allocates a unique task key and:
        - Creates a folder: `/.system/implement/<key>/`.
@@ -503,6 +504,7 @@ The execution script exposes at least the following conceptual interfaces:
      - Finds the relevant implementation(s).
      - Executes the underlying tool(s), potentially including nested high-level abilities.
      - Records execution details and results in `tool_call.md`.
+     - Triggers `PostAbilityCall` hooks via the Hook Runner (including both global and ability-specific hooks).
    - Output:
      - Standardized result structure from the registry (success/error/payload).
 
@@ -528,12 +530,12 @@ The execution script exposes at least the following conceptual interfaces:
      - Removed when cache is cleared.
    - Deleting a task should also clean up related cached data.
 
-#### Availability checks and guardrails
+#### Availability checks and hooks
 
-The execution script enforces a common set of checks before an ability is accepted or executed:
+The Tool Runner, together with the Hook Runner, enforces a common set of checks before an ability is accepted or executed:
 
 - Validate input structure and constraints using registry schemas.
-- Evaluate guardrail rules:
+- Resolve and trigger `PreAbilityCall` hooks:
   - Environment restrictions (e.g. “no prod writes”).
   - Manual approval requirements.
   - Rate limits and quotas.
@@ -560,7 +562,7 @@ For each **task-based** invocation (where a task key is created), the script sho
 This information is later used to:
 
 - Improve `ABILITY.md` content.
-- Refine matcher and guardrail rules.
+- Refine matcher rules and ability-level hook bindings (for example, which `hooks.pre_call` / `hooks.post_call` apply).
 - Discover new candidate abilities from AI-generated scripts.
 
 #### Handling high-level abilities
@@ -574,17 +576,17 @@ High-level abilities introduce additional complexity:
 Recommended handling:
 
 1. **Nested execution**
-   - Allow the execution script to **invoke itself** recursively for nested abilities.
+   - Allow the Tool Runner to **invoke itself** (or be invoked transitively) for nested abilities.
    - Record parent-child relationships between task keys for traceability.
 2. **Shared primitive operations**
-   - Ensure the execution script has robust base support for:
+   - Ensure the Tool Runner has robust base support for:
      - MCP calls.
      - API calls.
      - Local script execution.
    - High-level abilities should only orchestrate; they should not reimplement these primitives.
 3. **Interactive input**
    - Define clear markers in the registry for input fields that require human input.
-   - The execution script should:
+   - The Tool Runner (and any wrapper around it, such as the Agent Runtime) should:
      - Pause execution and request input via a documented channel.
      - Or allow AI-supplied input when marked as safe and automatic.
 
@@ -605,9 +607,9 @@ Example workflow for a high-level ability:
 
 1. Read `ABILITY.md`, find `signup_e2e_test`.
 2. Read registry to understand required input.
-3. Call `ability task.create` with the ability id and input.
+3. Ask the Agent Runtime (or a CLI that wraps the Tool Runner) to run `ability task.create` with the ability id and input.
 4. If available, receive task key `task-123`.
-5. Later, call `ability task.run` with `task-123` to execute.
+5. Later, ask it to run `ability task.run` with `task-123` to execute.
 
 ### 2.4 Directional Invocation
 
@@ -615,12 +617,12 @@ Directional invocation means explicitly selecting and calling an ability, either
 
 There are three main patterns:
 
-1. **Task-based, via execution script**
+1. **Task-based, via Agent Runtime / Tool Runner**
    - Follow the standard flow: create task → run task using a key.
    - This is the recommended path for most usage, as it records intent and results.
 
-2. **Direct scripted execution**
-   - The user (human or AI) reads the registry and calls the execution script directly with:
+2. **Direct Tool Runner execution (non-session contexts)**
+   - A human or automation reads the registry and calls the Tool Runner directly with:
      - Ability id or operation key.
      - Input payload according to the registry.
    - This bypasses task creation and logging; use for low-risk utilities or debugging.
@@ -633,7 +635,7 @@ Example directional usage:
 
 - A human developer wants to quickly run a one-off billing regression:
   - They identify `billing_regression` in `integration/ABILITY.md`.
-  - They invoke the execution script directly with the ability id and minimal input.
+  - They invoke the Tool Runner directly with the ability id and minimal input.
 - An AI agent that has a durable plan and needs traceability:
   - Uses the task-based interface for every ability that affects shared state.
 
@@ -804,14 +806,14 @@ Hook mechanisms can be activated in four ways:
 3. Post-call caching of AI tool usage.
 4. Post-processing based on cached information.
 
-The `matcher` and `guardrail` fields in both low-level and high-level configuration documents support these mechanisms.
+The `matcher` field in configuration documents and the ability-level hook bindings (`hooks.pre_call` / `hooks.post_call`) described earlier support these mechanisms.
 
 - **Matcher**
   - A set of rules that map input text (user prompts, plan text) to candidate abilities.
   - Example: if the plan mentions “signup”, “create user”, or “registration”, suggest abilities related to user signup flows.
-- **Guardrail**
-  - A set of rules applied at execution time to enforce constraints.
-  - Example: block destructive operations in production or require manual approval.
+- **Guardrail behavior (via hooks)**
+  - Guardrail behavior is implemented by `PreAbilityCall` hooks (referenced from `hooks.pre_call`) and, where appropriate, `PostAbilityCall` hooks.
+  - Example: a pre-call hook may block destructive operations in production or require manual approval.
 
 Example matcher configuration (conceptual):
 
@@ -821,15 +823,17 @@ Example matcher configuration (conceptual):
   - Negative keywords: `backup`, `archive`.
   - Scope filters: only modules that own user data.
 
-Example guardrail configuration (conceptual):
+Example guardrail-related configuration (conceptual):
 
 - Ability: `billing_regression`
-- Guardrails:
-  - Only callable in `staging` and `test` environments.
-  - Requires manual confirmation if the run triggers more than N API calls.
-  - Logs every run with a high-visibility tag.
+- Hooks:
+  - `matcher` rules that surface the ability when billing regression scenarios are detected.
+  - `hooks.pre_call` listing one or more pre-call hook ids that:
+    - Only allow calling in `staging` and `test` environments.
+    - Require manual confirmation if the run triggers more than N API calls.
+  - `hooks.post_call` listing hook ids that log every run with a high-visibility tag.
 
-Beyond direct matching and guardrails, we can use **usage-based hooks**:
+Beyond direct matching and hook-based guardrails, we can use **usage-based hooks**:
 
 - Aggregate data from `tool_call.md`:
   - Common AI intents.
@@ -857,7 +861,7 @@ Configuration is critical: incorrect configuration can cause abilities to behave
     - Timeouts, limits, and endpoints conform to policy.
 - **Expose configuration to the AI in a controlled way**
   - The AI should not read raw credentials or secrets.
-  - Instead, the AI should rely on the execution script’s feedback to know:
+  - Instead, the AI should rely on the Agent Runtime’s (or Tool Runner’s) feedback to know:
     - Whether an ability is available.
     - Which modes (e.g. environments, optional behaviors) are currently configured.
 

@@ -2,7 +2,7 @@
 
 ## Roles & Terms
 
-This guide follows the shared glossary defined in the the same directory's README (`AI developer`, `internal orchestration`, `runtime`, `hook layer`, and `humans`). It uses those terms as defined there and does not introduce additional role names.
+This guide follows the shared glossary defined for AI-facing docs in this repository (for example, the project-level `AGENTS.md` and any shared glossary it references). It uses the standard terms `AI developer`, `Agent Runtime`, `Tool Runner`, `Hook Runner`, and `humans` as defined there and does not introduce additional role names.
 
 ## 1. Purpose & Scope of Strategy Docs
 
@@ -17,7 +17,7 @@ This document defines how strategy documents named `AGENTS.md` are used and orga
   - How AI should interpret them.
   - How to maintain them as a network of strategy docs.
 
-Other project documents (such as design docs, tool descriptions, or knowledge indexes) may be referenced by `AGENTS.md`, but their internal structure is not defined here.
+Other project documents (such as design docs, tool descriptions, or knowledge indexes) may be referenced by `AGENTS.md`, but their internal structure is not defined here. Human-facing `README.md` files are for humans only; AI systems should treat `AGENTS.md` as their primary entrypoint and ignore `README.md` content unless a strategy doc explicitly tells them to look for a specific, human-curated fact.
 
 
 ## 2. Strategy Doc Layers in This Repo
