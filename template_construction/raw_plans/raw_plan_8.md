@@ -85,10 +85,9 @@
 - 每个能力必须：  
   - 在 `.system/registry/low-level|high-level` 注册；  
   - 在 `.system/registry/config/abilities.yaml` 有执行配置；  
-  - 在对应模块的 `ABILITY.md` 有说明；  
-  - 有至少一个相关测试用例（单测或集成测试）。  
+  - 经过了至少一个相关测试用例（单测或集成测试）。  
 
-- 所有能力均为**模板 infra 能力**，不引入具体业务（例如教育业务）逻辑。  
+- 所有能力均为**模板 infra 能力**，不引入具体业务逻辑。  
 
 ---
 
