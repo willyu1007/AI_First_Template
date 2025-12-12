@@ -20,8 +20,8 @@ Before starting Phase 2, the AI must verify:
 
 1. Phase 1 layout exists (see Phase 1 DoD).  
 2. The following files exist (possibly as empty placeholders):
-   - Root `DOCS_CONVENTION.md`.  
    - Root `AGENTS.md`.  
+   - `DOCS_CONVENTION.md`.  
    - `modules/AGENTS.md`.  
    - `knowledge/README.md` and `knowledge/architecture/overview.md`.  
    - `knowledge/modules/template/*`.  

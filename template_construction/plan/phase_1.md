@@ -21,13 +21,13 @@ This phase is intentionally **content-light**: create structures and minimal pla
 Before you start, you must:
 
 1. Read or re-read the core architecture docs (paths are indicative):  
-   - Root `README.md` (if it exists yet in this construction repo).  
-   - `modular_mannual.md`.  
-   - `ability_routing.md`.  
-   - `content_routing.md`.  
-   - `agents_strategy_guide.md`.  
-   - `hooks.md`.  
-   - `devops_extension_guide.md`.  
+   - `blueprint/README.md`.  
+   - `blueprint/modular_mannual.md`.  
+   - `blueprint/ability_routing.md`.  
+   - `blueprint/content_routing.md`.  
+   - `blueprint/agents_strategy_guide.md`.  
+   - `blueprint/hooks.md`.  
+   - `blueprint/devops_extension_guide.md`.  
 2. Open `template_construction/workdocs/` and ensure the following files exist (create them if necessary):  
    - `preparation.md`, `plan.md`, `task.md`, `todolist.md`, `context.md`, `outcome.md`.  
 3. In `preparation.md`, add a **Phase 1 section** summarizing the architecture invariants that affect layout:
@@ -45,31 +45,33 @@ You may assume the repo is otherwise empty or near-empty.
 You must create a directory tree that supports the architecture and DevOps extensions. At minimum, the root should contain:
 
 ```text
-/README.md
+
 /AGENTS.md
-/ARCHITECTURE_OVERVIEW.md
-/DOCS_CONVENTION.md
-/modular_mannual.md            # architecture spec (provided or copied in)
-/ability_routing.md
-/content_routing.md
-/agents_strategy_guide.md
-/hooks.md
-/devops_extension_guide.md
+/README.md
+
+/blueprint/
+  README.md
+  modular_mannual.md            # architecture spec (provided or copied in)
+  ability_routing.md
+  content_routing.md
+  agents_strategy_guide.md
+  hooks.md
+  devops_extension_guide.md
 
 /modules/
   AGENTS.md
   ROUTING.md
   routes/
-    README.md
+    AGENTS.md
   overview/
-    README.md
+    AGENTS.md
     type_registry.yaml
     instance_registry.yaml
     instance_maturity.yaml
     interfaces.yaml
 
 /knowledge/
-  README.md
+  AGENTS.md
   architecture/
     overview.md
   modules/
@@ -85,10 +87,13 @@ You must create a directory tree that supports the architecture and DevOps exten
     deploy_template.md
 
 /.system/
+  guides/
+    ARCHITECTURE_OVERVIEW.md
+    DOCS_CONVENTION.md
   hooks/
-    README.md
+    AGENTS.md
   registry/
-    README.md
+    AGENTS.md
     schemas/           # schema files will be created in Phase 4
     low-level/
     high-level/
@@ -99,39 +104,39 @@ You must create a directory tree that supports the architecture and DevOps exten
   AI/
     AGENTS.md
   workdocs/
-    README.md
+    AGENTS.md
 
 /db/
   schema/
-    README.md
+    AGENTS.md
   migrations/
-    README.md
+    AGENTS.md
   config/
-    README.md
+    AGENTS.md
   samples/
-    README.md
+    AGENTS.md
   workdocs/
-    README.md
+    AGENTS.md
 
 /ops/
   packaging/
     AGENTS.md
     scripts/
-      README.md
+      AGENTS.md
     workdocs/
-      README.md
+      AGENTS.md
   deploy/
     AGENTS.md
     scripts/
-      README.md
+      AGENTS.md
     workdocs/
-      README.md
+      AGENTS.md
 
 /scripts/
   hooks/
-    README.md
+    AGENTS.md
   devops/
-    README.md
+    AGENTS.md
 
 /template_construction/
   AGENTS.md
@@ -171,7 +176,7 @@ You may refine this structure slightly in later phases, but **paths used by arch
 
 ### 4.2 Create Root-Level Files and Directories
 
-- Create the root-level Markdown files (`README.md`, `AGENTS.md`, `ARCHITECTURE_OVERVIEW.md`, `DOCS_CONVENTION.md`, and architecture specs).  
+- Create the root-level Markdown files (`AGENTS.md`, `README.md`，`/.system/guides/ARCHITECTURE_OVERVIEW.md`, `/.system/guides/DOCS_CONVENTION.md`, and architecture specs).  
 - For now, most may contain `"TODO: to be filled in later phases"`. Do **not** write detailed content yet.  
 - Create directories `modules/`, `knowledge/`, `.system/`, `PROJECT_INIT/`, `db/`, `ops/`, `scripts/`, `template_construction/`.
 
@@ -181,11 +186,11 @@ Mark the corresponding checklist items in `todolist.md` as done when finished.
 
 1. Under `modules/`:
    - Create `AGENTS.md` and `ROUTING.md` with minimal placeholder headings.  
-   - Create `routes/README.md`.  
+   - Create `routes/AGENTS.md`.  
    - Create `overview/` with the YAML files listed above, each containing a minimal, valid YAML header (e.g. `# TODO: fill in registry` plus an empty structure).
 
 2. Under `knowledge/`:
-   - Create `README.md`, `architecture/overview.md`.  
+   - Create `AGENTS.md`, `architecture/overview.md`.  
    - Create `modules/template/` with:
      - `AGENTS.md`, `layout.md`, `manifest_fields.md`, `registration_flow.md`.  
      - `examples/homework_system.md` with placeholder text.  
@@ -196,15 +201,15 @@ Update `todolist.md` as you complete each sub-area.
 ### 4.4 Create .system and DevOps Layouts
 
 1. Under `.system/`:
-   - Create `hooks/README.md`.  
-   - Create `registry/README.md`.  
+   - Create `hooks/AGENTS.md`.  
+   - Create `registry/AGENTS.md`.  
    - Create empty `registry/schemas/`, `registry/low-level/`, and `registry/high-level/` directories.
 
 2. Under `PROJECT_INIT/`, `db/`, `ops/packaging/`, and `ops/deploy/`:
    - Create the subdirectories and placeholder READMEs and AGENTS files as in the layout section above.
 
 3. Under `scripts/`:
-   - Create `hooks/README.md` and `devops/README.md` only; actual scripts come in later phases.
+   - Create `hooks/AGENTS.md` and `devops/AGENTS.md` only; actual scripts come in later phases.
 
 ### 4.5 Initialize template_construction/ Workspace
 
