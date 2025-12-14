@@ -97,6 +97,69 @@ Module instances declare their `module_type` in `MANIFEST.yaml` and are validate
   - Used primarily for human understanding, documentation grouping, and navigation.
   - The system does not use this as a hard constraint for runtime behavior.
 
+
+### 1.4 Module Boundaries and When to Create a New Module Instance
+
+A module instance is a **durable ownership boundary** that the repository infrastructure can address (routing, guardrails, CI, orchestration). It is **not** a directory-level representation of every workflow, UI surface, or user role.
+
+Creating a new module also implies a **registration commitment**: the instance must be scaffolded, registered in project-level registries, and kept consistent over time (see Section 5.3).
+
+#### 1.4.1 What belongs in a module (vs. what does not)
+
+Create a new module instance when the boundary is primarily driven by **ownership, contracts, and lifecycle**, not by “how many flows exist”.
+
+**Hard signals (usually sufficient on their own):**
+
+- The capability **owns persistent state or invariants** (DB tables/fields, event streams, long-lived resources) that must be maintained as a coherent unit.
+- The capability exposes a **stable external contract** that other modules must depend on (HTTP/gRPC APIs, events, shared data contracts).
+- The capability has a distinct **lifecycle / risk profile** that benefits from isolation (separate deployment, separate approvals, separate safety guardrails).
+
+**Soft signals (strengthen the case):**
+
+- Separate team ownership, review policy, or on-call boundaries.
+- Different scaling / performance characteristics from surrounding code.
+- Reuse across multiple product surfaces (multiple clients or roles).
+- The AI context boundary is materially improved (without the split, the module becomes too large to reason about safely).
+
+**Non-signals (do not create modules for these alone):**
+
+- User roles (student / parent / teacher / school) or client form factors (web / app).
+- Individual workflows or UI “flows” that do not require independent ownership of state/contracts.
+- UI sub-apps inside a single deployable client when they share the same build/deploy unit.
+- Minor variations that can be expressed as configuration, feature flags, or internal subpackages.
+
+When the problem is “workflow complexity” rather than “ownership boundaries”, prefer to keep code inside an existing module and model the workflow as:
+
+- an **integration scenario** in `modules/integration/scenarios.yaml` when it spans multiple modules, or
+- a **high-level ability** (workflow/agent) when it is repeatedly executed and worth standardizing.
+
+#### 1.4.2 Registration-aware decision flow
+
+Because module creation triggers registry updates and cross-module validation, treat it as a structured decision:
+
+1. **Start from the closest existing module boundary.**  
+   If a change fits within an existing module’s stated responsibility, extend that module first.
+
+2. **Decide whether the boundary must be its own module.**  
+   Apply the criteria in Section 1.4.1; if the only driver is “workflow complexity”, prefer scenarios/abilities instead of new module instances.
+
+3. **If you decide to create a new module, scaffold and register it immediately.**  
+   Use the scaffolding flow in Section 5.3.1 and avoid leaving “half-created” module directories in the tree.
+
+4. **Use the “registered” definition as acceptance criteria.**  
+   If you cannot meet the minimum skeleton + registries in Section 5.3.2, delay module creation and keep the work inside an existing module until the boundary is ready.
+
+#### 1.4.3 Example: Multi-role education platform without module explosion
+
+In a platform with students, parents, teachers, and schools (accessed via web and app), avoid creating one module per role and per workflow. Instead:
+
+- Create **client modules** only when they are distinct build/deploy units (for example, teacher web vs teacher app).
+- Keep per-client sub-apps (homework, assessment, reporting) as internal subpackages unless they require independent contracts or lifecycle isolation.
+- Create **domain modules** for durable business capabilities (for example, homework, assessment, reporting) when they own state or contracts.
+- Model cross-module end-to-end flows as **integration scenarios** and/or reusable orchestration as **high-level abilities**.
+
+Monorepo note: the same module boundaries can map 1:1 to workspace packages in a monorepo, while the modular registries remain the source of truth.
+
 ---
 
 ## 2. Module Instance Skeleton
@@ -1200,6 +1263,9 @@ Scaffolding tools may be implemented as CLI commands, a web console, or IDE plug
 
 A scaffolding script initializes a new module instance to guarantee consistency.
 
+Before registering a new module, confirm that it is warranted as a module boundary (see Section 1.4).
+If the work is primarily about workflows rather than ownership boundaries, prefer scenarios/abilities and keep the code inside an existing module until the boundary is ready.
+
 Typical flow:
 
 1. **Collect information (interactive)**
@@ -1272,6 +1338,9 @@ This section illustrates a domain-oriented type graph for a homework system with
 - Collect: collect submissions.
 - Overview: provide aggregate views and dashboards.
 - Grading: grade submissions and provide feedback.
+
+Note: this example is intentionally stage-oriented for clarity; it does not imply that every workflow step or user role should become its own module instance.
+Apply the boundary rules in Section 1.4 when deciding what should be registered as a module.
 
 #### 5.4.1 Stage-Level Types
 

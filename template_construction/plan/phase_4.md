@@ -63,11 +63,11 @@ Registry **content** is split as follows:
 
 - Content routing under `modules/routes/*.yaml`.  
 - Abilities under `.system/registry/low-level/*.yaml` and `.system/registry/high-level/*.yaml`.  
-- Hooks under `.system/hooks/*.yaml` (one file per hook type, e.g. `PromptSubmit.yaml`).
+- Hooks under `.system/hooks/*.yaml` (one file per hook id, e.g. `ability_usage_tracker.yaml`; each file declares an `event_type` such as `PromptSubmit`, `PreAbilityCreate`, `PreAbilityCall`, `PostAbilityCall`, or `SessionStop`).
 
 ### 3.2 Tasks
 
-1. In `.system/registry/README.md`, list all registry types and for each:  
+1. In `.system/registry/AGENTS.md`, list all registry types and for each:  
    - Schema file path.  
    - Content file path(s).  
    - One-line purpose.
@@ -231,7 +231,7 @@ Issues identified in review should be addressed by the AI and logged in `outcome
 Phase 4 is complete when:
 
 1. `.system/registry/schemas/*.schema.yaml` exist and have passed at least one human review.  
-2. `.system/registry/README.md` documents all registry types and their schema/content mappings.  
+2. `.system/registry/AGENTS.md` documents all registry types and their schema/content mappings.  
 3. Script-based write functions exist for all major registry types (modules, routes, abilities, hooks).  
 4. At least one sample entry per registry type can be written via the scripts without corrupting the YAML structure.  
 5. `registry_coordination.md` and corresponding `check_*_consistency` functions are in place and invoked by default in write flows.  

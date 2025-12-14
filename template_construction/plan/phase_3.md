@@ -28,6 +28,7 @@ Before starting Phase 3, the AI must:
 3. In `template_construction/workdocs/preparation.md`, write a **Phase 3 section** capturing:
    - Key architectural concepts for modules, abilities, content routing, and hooks.  
    - Any mismatches or ambiguities discovered across architecture docs.
+4. `reference/workdocs_mannual.md` is a user manual for working documents， refer to it when designing related content.
 
 ---
 
@@ -68,6 +69,8 @@ Define **standard workflows** for critical areas and document them in AI-readabl
 - `knowledge/architecture/hook_lifecycle.md`
 
 ### 4.2 Required Content for Each Workflow Doc
+
+Documents need to be designed so that AI can efficiently understand the content and avoid unnecessary token burden.
 
 For each workflow:
 

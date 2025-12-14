@@ -62,9 +62,12 @@ This flow must be used at least once for each major scaffolding scenario.
 
 ### 3.1 Tasks
 
-1. Select a small set of knowledge docs (e.g., a subset of `knowledge/architecture` and `knowledge/devops`) that are realistic and stable.  
+1. Select knowledge that are realistic and stable:
+   - a subset of `knowledge/architecture` and `knowledge/devops`.
+   - documents in the `reference/agents` and `reference/skills` directories.  
+   - other general programming skills that you find usefu.
 2. Ensure they are placed in the right subdirectories and linked from:
-   - Root `AGENTS.md`.  
+   - `knowledge/AGENTS.md`.  
    - `modules/AGENTS.md`.  
    - DevOps AGENTS (`PROJECT_INIT`, `db`, `ops/packaging`, `ops/deploy`) as appropriate.  
 3. Use workdocs (scenario-local) to record:
@@ -76,6 +79,7 @@ This flow must be used at least once for each major scaffolding scenario.
 
 - Confirm that an AI reading AGENTS and knowledge can navigate from high-level tasks to the correct docs.  
 - Check that no knowledge doc violates its directory’s single-responsibility principle.
+- Ensure that every document meets the requirements in `DOCS_CONVENTION.md`, wwith a focus on checking whether it is suitable for AI to understand semantics, rewrite if necessary.
 
 ---
 
@@ -126,7 +130,8 @@ For each selected ability:
 Humans should choose a small number of hooks to exercise different stages, e.g.:
 
 - A `PromptSubmit` hook for routing hints or intent normalization.  
-- A `PreAbilityCall` hook that guards critical abilities.  
+- A `PreAbilityCreate` hook that performs availability and preflight checks for critical abilities.  
+- A `PreAbilityCall` hook that guards critical executions.  
 - A `PostAbilityCall` hook used for logging or metrics.
 
 ### 5.2 Flow per Hook
@@ -135,10 +140,10 @@ For each selected hook:
 
 1. **Planning (AI)**  
    - In scenario-local workdocs, create a hook plan describing:
-     - Hook type and event (`PromptSubmit`, `PreAbilityCall`, etc.).  
+     - Hook id and `event_type` (`PromptSubmit`, `PreAbilityCreate`, `PreAbilityCall`, `PostAbilityCall`, or `SessionStop`).  
      - Target abilities or ability groups.  
      - Expected behavior at a high level.  
-     - Required registry changes in `.system/hooks/<hook_type>.yaml`.
+     - Required registry changes in `.system/hooks/<hook_id>.yaml` (following the hook schema and including `match` rules, handler spec, and effects).
 
 2. **Human confirmation**  
    - Human checks whether scope is too broad or too narrow.  

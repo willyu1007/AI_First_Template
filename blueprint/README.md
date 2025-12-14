@@ -113,6 +113,20 @@ The type graph is used to:
 - Validate integration scenarios
 - Help the AI choose legal paths when building end-to-end flows
 
+
+### 2.3 Module boundaries (avoid module explosion)
+
+Modules are **durable ownership boundaries**. They are not intended to represent every workflow, UI surface, or user role as separate entries under `modules/`.
+
+To keep the module tree clear under complex products (multi-role, multi-client, many flows):
+
+- Create a new module when it owns persistent state/invariants or exposes a stable contract that other modules depend on.
+- Do not create modules purely for user roles (teacher/student/parent), client form factor (web/app), or individual UI workflows.
+- Model cross-module end-to-end flows as integration scenarios (`modules/integration/scenarios.yaml`) and reusable orchestration as high-level abilities.
+- When you decide to create a module, use the scaffolding + registration flow (avoid “half-registered” modules).
+
+See `modular_mannual.md` Section 1.4 (module boundaries) and Section 5.3 (instance registration).
+
 ---
 
 ## 3. Strategy Docs (`AGENTS.md`)
@@ -224,7 +238,10 @@ From the AI developer’s perspective:
 
 The Tool Runner:
 
-- Applies configuration and hook-based guardrails (via `PreAbilityCall` / `PostAbilityCall` hooks and ability-level `hooks.pre_call` / `hooks.post_call` bindings).
+- Applies configuration and hook-based guardrails via a split lifecycle:
+  - `PreAbilityCreate` (preflight at `task.create`, using ability-level `hooks.pre_create`)
+  - `PreAbilityCall` (guardrails at `task.run`, using ability-level `hooks.pre_call`)
+  - `PostAbilityCall` (infra-only post-processing, using ability-level `hooks.post_call`)
 - Chooses implementations (script / MCP / API) according to ability registries and configuration.
 - Records usage in `.system/implement/<task-key>/tool_call.md`
 
@@ -337,25 +354,34 @@ Hooks are **repository-local automation** that run on specific runtime events an
 
 ### 7.1 Events
 
-Hooks attach to four main events emitted by the runtime:
+Hooks attach to five main events emitted by the runtime:
 
 - `PromptSubmit` – new user task/message arrives  
+- `PreAbilityCreate` – right before an ability task is created (preflight, no execution)  
 - `PreAbilityCall` – right before an ability is executed  
 - `PostAbilityCall` – right after an ability finishes  
 - `SessionStop` – session or logical phase ends
 
+
 ### 7.2 Blocking vs non-blocking
 
 - **Blocking events** (AI-facing)
-  - `PromptSubmit`, `PreAbilityCall`
+  - `PromptSubmit`, `PreAbilityCreate`, `PreAbilityCall`
   - Hooks can:
     - Suggest routing choices (abilities, docs)
     - Normalize intent
-    - Enforce guardrails (allow/deny ability calls)
-  - Their signals are provided to the AI as part of the turn context
+    - Enforce availability checks at task creation (preflight)
+    - Enforce execution guardrails (allow/deny ability calls)
+  - Their signals are provided to the AI as structured context and/or as part of Tool Runner responses
 
 - **Non-blocking events** (infra-only)
   - `PostAbilityCall`, `SessionStop`
+  - Hooks can:
+    - Log usage and latency
+    - Update caches and reports
+    - Run builds/tests and write summaries
+  - They do not affect the current turn’s logic
+
   - Hooks can:
     - Log usage and latency
     - Update caches and reports
@@ -387,7 +413,8 @@ Handlers receive a JSON context and return a structured result. For AI-facing ev
 
 - `routing_hint` – suggested abilities/documents
 - `normalized_intent` – parsed task description
-- `ability_guard` – allow/deny ability calls
+- `ability_preflight` – availability/preflight result at `PreAbilityCreate` (task.create)
+- `ability_guard` – allow/deny ability calls at `PreAbilityCall` (task.run)
 
 The runtime merges these signals and exposes them to the AI as structured context. The AI still owns the plan; hooks only provide hints and guardrails.
 
@@ -396,7 +423,7 @@ The runtime merges these signals and exposes them to the AI as structured contex
 Hooks and routing are intentionally aligned:
 
 - Knowledge routing can use trigger-like hooks to surface relevant topics/docs
-- Ability routing uses `matcher`/`guardrail` config in registries to drive hooks
+- Ability routing uses ability-side `routing_hints` metadata (for suggestions) and per-ability hook bindings (`hooks.pre_create` / `hooks.pre_call` / `hooks.post_call`) to drive hooks
 - Workdocs can be updated by hooks after ability calls or at session end
 
 Together they create a light-weight, event-driven layer around the AI’s internal orchestration.

@@ -35,7 +35,7 @@ The repository already contains several **architecture specification documents**
 
 There are also 8 planning documents:
 
-In addition, `template_construction/construction_principles.md` defines the **global principles and rules** for building the template. It governs collaboration between external AIs and humans, phase gating, and `workdocs/` usage, and it **sits above the 8 construction phases and applies to all of them**.
+In addition, `template_construction/reference/construction_principles.md` defines the **global principles and rules** for building the template. It governs collaboration between external AIs and humans, phase gating, and `workdocs/` usage, and it **sits above the 8 construction phases and applies to all of them**.
 
 - `template_construction/plan/phase_1.md` – repo skeleton (directories + empty files) and global layout.
 - `template_construction/plan/phase_2.md` – documentation conventions and `AGENTS.md` structure.
@@ -241,7 +241,7 @@ For each phase `N`:
    - Keep content consistent with the specs and the cross‑doc alignment rules.
    - **Do not** invent new conceptual layers or roles unless they are clearly aligned with existing terms (module, ability, knowledge routing, runtime, hook, DevOps scenario).
 5. **Run the Phase Review Workflow**
-   - Use the “Phase Review Workflow (pseudo‑agent)” prompt (see the companion document `phase_review_workflow.md`) to review the phase’s results.
+   - Use the “Phase Review Workflow (pseudo‑agent)” prompt (see the companion document `reference/phase_review_workflow.md`) to review the phase’s results.
    - Fix blocking issues identified by the review before marking the phase as complete.
 6. **Update workspace**
    - Update `workdocs/context.md` with what was achieved, what remains, and how the repo changed.

@@ -36,7 +36,7 @@ Scope: initialize a concrete project from the template.
   - `PROJECT_INIT/workdocs/`
 
 - Knowledge doc:  
-  - `knowledge/scaffolding/project_init.md`
+  - `PROJECT_INIT/AI/project_init.md`
 
 Constraint: all project initialization scripts and workdocs live under `PROJECT_INIT/`.
 
@@ -74,9 +74,12 @@ Each scenario must have:
 Create or populate:
 
 ```text
+PROJECT_INIT/
+  AI/
+    init_project.md
+
 knowledge/
   scaffolding/
-    project_init.md
     new_module.md
     new_ability_low.md
     new_ability_high.md

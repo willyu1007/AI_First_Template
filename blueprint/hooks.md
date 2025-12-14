@@ -18,7 +18,7 @@ The goals of this design:
 2. **Stay lightweight and optional**  
    - The repo must work with all hooks disabled; hooks are an “extra layer,” not core logic.
 3. **Keep responsibilities sharp**  
-   - Only some events may directly influence the AI’s current turn. Others are infra‑only.
+   - Only some events may directly influence the AI’s current turn or a tool call. Others are infra‑only.
 4. **Be easy to scaffold and maintain**  
    - Hooks are small YAML files + handler scripts; a dedicated scaffold flow helps create them.
 
@@ -33,7 +33,7 @@ This document follows the shared glossary defined for AI-facing docs in this rep
 We assume four main roles in this repo:
 
 - **AI developer**  
-  - The large code-capable model loop that plans, edits, and proposes actions (for example, “create task”, “run task”).
+  - The code-capable model loop that plans, edits, and proposes actions (for example, “create task”, “run task”).
 - **Agent Runtime**  
   - The **only long-running** process or service that:
     - Receives user input.
@@ -43,51 +43,61 @@ We assume four main roles in this repo:
 - **Tool Runner**  
   - A non-resident execution library/CLI that:
     - Provides task interfaces for abilities (`task.create`, `task.run`, etc.).
-    - Emits ability-level events (`PreAbilityCall`, `PostAbilityCall`).
+    - Emits ability-level events (`PreAbilityCreate`, `PreAbilityCall`, `PostAbilityCall`).
     - Calls concrete implementations (scripts, MCP tools, APIs) according to ability registries and configuration.
 - **Hook layer / Hook Runner**  
   - Repository-local configuration + handler scripts that run on specific events.
   - Exposed as a library function such as `run_hooks(event_type, context, blocking_only)`.
-  - Reused by both the Agent Runtime (for `PromptSubmit` / `SessionStop`) and the Tool Runner (for `PreAbilityCall` / `PostAbilityCall`).
+  - Reused by both the Agent Runtime (for `PromptSubmit` / `SessionStop`) and the Tool Runner (for `PreAbilityCreate` / `PreAbilityCall` / `PostAbilityCall`).
 
 High‑level flow for a typical interactive session:
 
-1. User or system sends a new **task / message**.  
-2. The Agent Runtime emits a `PromptSubmit` event and calls the Hook Runner with `run_hooks("PromptSubmit", ctx, blocking_only=True)`.  
-3. The Agent Runtime merges hook signals into a **turn context**, then hands control to the AI developer.  
-4. The AI plans and produces a list of **actions** (for example: `LIST_ABILITIES`, `CREATE_TASK`, `RUN_TASK`).  
-5. For each ability-related action (such as `CREATE_TASK`, `RUN_TASK`):
-   - The Agent Runtime delegates to the Tool Runner (for example, `task.create`, `task.run`).
-   - The Tool Runner emits `PreAbilityCall` and calls the Hook Runner with `run_hooks("PreAbilityCall", ctx, blocking_only=True)`.
+1. User or system submits a new task/message.
+2. The Agent Runtime emits `PromptSubmit` and runs blocking hooks (`PromptSubmit` is AI-facing).
+3. The Agent Runtime merges hook signals into a **turn context**, then hands control to the AI developer.
+4. The AI plans and produces a list of actions (e.g. `CREATE_TASK`, `RUN_TASK`).
+5. For each `CREATE_TASK`:
+   - The Agent Runtime delegates to the Tool Runner (`task.create`).
+   - The Tool Runner emits `PreAbilityCreate` and runs blocking hooks (availability + preflight).
+   - If allowed, the Tool Runner allocates a task key and persists task metadata.
+6. For each `RUN_TASK`:
+   - The Agent Runtime delegates to the Tool Runner (`task.run`).
+   - The Tool Runner emits `PreAbilityCall` and runs blocking hooks (guardrails).
    - If allowed, the Tool Runner executes the underlying implementation.
-   - After execution, the Tool Runner emits `PostAbilityCall` and calls the Hook Runner with `run_hooks("PostAbilityCall", ctx, blocking_only=False)` for infra‑only hooks.
-6. When the session ends or a logical phase completes:
-   - The Agent Runtime emits `SessionStop` and calls the Hook Runner with `run_hooks("SessionStop", ctx, blocking_only=False)`.
-   - These hooks may run build/test, persist summaries, update caches, etc.
+   - After execution, the Tool Runner emits `PostAbilityCall` and runs infra-only hooks (telemetry).
+7. When the session ends:
+   - The Agent Runtime emits `SessionStop` and runs infra-only hooks (build/test, summaries, cache refresh, etc.).
 
-Hooks are entirely driven by the Agent Runtime and Tool Runner; the AI never calls hooks directly. Instead, the AI sees **structured “hook signals” and control messages** that the Agent Runtime injects into the turn context.
+Hooks are entirely driven by the Agent Runtime and Tool Runner; the AI never calls hooks directly. Instead, the AI sees **structured “hook signals” and control messages** injected into the turn context and/or returned as part of tool/task responses.
 
 ---
 
 ## 1. Event Model and Lifecycle
 
-Hooks attach to **events** emitted by the Agent Runtime and Tool Runner. Each event type has a clear purpose and a specific **interaction contract** with the AI developer loop.
+Hooks attach to **events** emitted by the Agent Runtime and Tool Runner. Each event type has a clear purpose and a specific interaction contract with the AI developer loop.
 
 ### 1.1 Event types
 
 This document uses the following events:
 
 - `PromptSubmit`  
-  Emitted when a new user task / message is submitted. Used to:
+  Emitted when a new user task/message is submitted. Used to:
   - Normalize intent.
   - Suggest abilities and documents.
   - Attach routing hints for the first turn.
 
+- `PreAbilityCreate`  
+  Emitted right before a task is created for an ability (`task.create`), **without executing the ability**. Used to:
+  - Validate basic availability (registry exists, config resolvable, env permitted).
+  - Validate input shape enough to create a task.
+  - Emit structured “preflight” results (available/unavailable + reason).
+  - Avoid mixing availability checks with execution guardrails.
+
 - `PreAbilityCall`  
-  Emitted right before an ability/tool is executed. Used to:
-  - Enforce guardrails and safety checks via configured hooks.
-  - Validate arguments and environment.
-  - Decide whether the ability call is allowed.
+  Emitted right before an ability/tool is executed (`task.run` or direct run). Used to:
+  - Enforce guardrails and safety checks.
+  - Validate arguments and environment at execution time.
+  - Decide whether the ability call is allowed to run now.
 
 - `PostAbilityCall`  
   Emitted right after an ability/tool finishes. Used to:
@@ -98,9 +108,8 @@ This document uses the following events:
 - `SessionStop`  
   Emitted when a session or logical phase ends. Used to:
   - Run build/test/lint across changed components.
-  - Aggregate and persist a session summary.
+  - Aggregate and persist summaries.
   - Prepare signals for future sessions (but not retroactively change this one).
-  - Act only as an infra-level event: it is **not** tied to any particular ability call and MUST NOT produce AI-facing `hook_signals` for the current turn.
 
 ### 1.2 Per‑event AI interaction contract
 
@@ -108,6 +117,7 @@ Not all events are allowed to interact with the AI in the same way. To keep the 
 
 - **AI‑facing, blocking events** – may directly shape the current turn and must run synchronously:
   - `PromptSubmit`
+  - `PreAbilityCreate`
   - `PreAbilityCall`
 - **Infra‑facing, post‑processing events** – may log, cache, or summarize, but **do not affect the current turn**:
   - `PostAbilityCall`
@@ -115,30 +125,13 @@ Not all events are allowed to interact with the AI in the same way. To keep the 
 
 Conceptually:
 
-| Event           | Timing              | Blocking? | May directly shape current turn? | Typical use cases                                           |
-|-----------------|---------------------|-----------|-----------------------------------|-------------------------------------------------------------|
-| PromptSubmit    | Before planning     | Yes       | **Yes**                           | Routing hints, normalized intent, doc suggestions          |
-| PreAbilityCall  | Before ability call | Yes       | **Yes**                           | Guardrails, pre‑flight checks, permission checks           |
-| PostAbilityCall | After ability call  | No (for AI)| **No**                           | Telemetry, quality metrics, logging, cache updates         |
-| SessionStop     | After session phase | No (for AI)| **No**                           | Build/test/lint aggregation, summaries for future sessions |
-
-Runtime behavior (Agent Runtime and Tool Runner together) must respect these contracts:
-
-- For **PromptSubmit** and **PreAbilityCall**:
-  - All **blocking hooks** must be run **before** the AI planner or ability execution proceeds.
-  - Hook outputs are merged into a structured **hook signal list** and sent to the AI with an explicit “ready” control signal.
-- For **PostAbilityCall** and **SessionStop**:
-  - Hooks may run in the background or synchronously from the caller’s point of view (Tool Runner for `PostAbilityCall`, Agent Runtime for `SessionStop`).
-  - Their outputs must **not** be fed back into the AI’s current planning loop.
-
-For `SessionStop` specifically:
-
-- The Agent Runtime is responsible for deciding when a session or logical phase ends.
-- At session/phase end, it always constructs a `SessionStopContext` from session state and calls `run_hooks("SessionStop", ctx, blocking_only=false)`, even if no `SessionStop` hooks are enabled.
-- If no hooks match, the event is still emitted but nothing is executed; behavior is entirely controlled by which `SessionStop` hooks exist under `.system/hooks/*.yaml`.
-
-PostAbilityCall is scoped strictly to ability/tool invocations. It may observe and log the tool's stdout/result as part of the infra context, but it is not used to inspect or modify the primary AI developer's own responses. 
-If you need to evaluate the AI's final replies, consider a separate infra-only event such as `ModelOutput`.
+| Event            | Timing                     | Blocking? | May directly shape current turn/call? | Typical use cases                                           |
+|------------------|----------------------------|-----------|---------------------------------------|-------------------------------------------------------------|
+| PromptSubmit     | Before planning            | Yes       | **Yes**                               | Routing hints, normalized intent, doc suggestions            |
+| PreAbilityCreate | Before task creation        | Yes       | **Yes**                               | Availability checks, input preflight, pre-create policy      |
+| PreAbilityCall   | Before ability execution    | Yes       | **Yes**                               | Guardrails, permission checks, approval requirements         |
+| PostAbilityCall  | After ability execution     | No (for AI) | **No**                              | Telemetry, quality metrics, logging, cache updates           |
+| SessionStop      | After session phase ends    | No (for AI) | **No**                              | Build/test/lint aggregation, summaries for future sessions   |
 
 ---
 
@@ -146,7 +139,7 @@ If you need to evaluate the AI's final replies, consider a separate infra-only e
 
 Hooks are declared as small YAML files under `.system/hooks/` (one file per hook). The runtime loads these files, filters them by event type and match rules, and executes the handlers.
 
-A typical hook file looks like this:
+A typical hook file looks like:
 
 ```yaml
 id: ability_usage_tracker
@@ -176,13 +169,13 @@ effects:
 - `id`  
   - Unique identifier within the repo. Use `kebab-case`.
 - `event_type`  
-  - One of: `PromptSubmit`, `PreAbilityCall`, `PostAbilityCall`, `SessionStop`.
+  - One of: `PromptSubmit`, `PreAbilityCreate`, `PreAbilityCall`, `PostAbilityCall`, `SessionStop`.
 - `enabled`  
   - `true` / `false`. Disabled hooks are ignored by the runtime.
 - `blocking`  
   - Controls whether hook failure or its decisions may block the main flow:
-    - For `PromptSubmit` and `PreAbilityCall`, blocking hooks are run **synchronously** and may affect whether planning or execution proceeds.
-    - For `PostAbilityCall` and `SessionStop`, `blocking` is usually `false` (AI‑facing behavior is disallowed; blocking only affects infra flows).
+    - For `PromptSubmit`, `PreAbilityCreate`, and `PreAbilityCall`, blocking hooks are run **synchronously** and may affect whether planning, task creation, or execution proceeds.
+    - For `PostAbilityCall` and `SessionStop`, `blocking` is usually `false` (AI-facing behavior is disallowed; blocking only affects infra flows).
 
 ### 2.2 Matching rules
 
@@ -190,8 +183,8 @@ Hooks may limit when they run with a `match` block:
 
 ```yaml
 match:
-  ability_scope: "*"                # glob over ability ids
-  min_duration_ms: 100              # only for slow calls
+  ability_scope: "*"                # glob over ability ids (ability-related events)
+  min_duration_ms: 100              # only for slow calls (PostAbilityCall)
   only_if_changed_paths:
     - "services/**"
     - "apps/**"
@@ -205,6 +198,12 @@ Common fields:
   - For `PostAbilityCall`, only run on calls slower than this threshold.
 - `only_if_changed_paths`  
   - For `SessionStop`, only run if any changed files match these patterns.
+
+#### Important: `match` is hook activation, not routing
+
+The `match` block decides **whether this hook runs**.
+
+It is not the repository’s routing rule language. Ability suggestions and knowledge suggestions should be produced by a small number of routing hooks (usually on `PromptSubmit`) that read routing documents and registry metadata, rather than spreading routing logic across many hook YAML files.
 
 ### 2.3 Handler spec
 
@@ -227,16 +226,6 @@ handler:
 
 The `effects` list is **descriptive only**: it documents what the handler intends to do. It is not an execution spec.
 
-Example:
-
-```yaml
-effects:
-  - run_local_build_checks
-  - summarize_errors_to_user
-```
-
-This helps both humans and the AI developer understand the hook’s purpose when browsing `.system/hooks/`.
-
 ---
 
 ## 3. Contexts, Hook Results, and Hook Signals
@@ -245,7 +234,7 @@ Handlers receive structured JSON context and return structured results. The runt
 
 ### 3.1 Event contexts (overview)
 
-Each event type has its own context shape; here we only outline the key fields.
+Each event type has its own context shape; here we outline the key fields.
 
 #### PromptSubmitContext (AI‑facing)
 
@@ -254,16 +243,15 @@ interface PromptSubmitContext {
   event_type: "PromptSubmit";
   session_id: string;
   user_raw_input: string;
-  current_files?: string[]; // optional snapshot of interesting files
-  // Additional session metadata as needed
+  current_files?: string[];
 }
 ```
 
 Hooks for this event may emit **routing hints** and **normalized intent**.
 
-#### PreAbilityCallContext (AI‑facing)
+#### PreAbilityCreateContext (AI‑facing)
 
-To make PreAbilityCall useful for both AI and background jobs, we include the caller:
+Preflight checks run at task creation time and should not assume the ability will run.
 
 ```ts
 type InvocationSource =
@@ -272,18 +260,53 @@ type InvocationSource =
   | "ci_pipeline"
   | "manual_cli";
 
+interface PreAbilityCreateContext {
+  event_type: "PreAbilityCreate";
+  session_id?: string;
+
+  // The target ability (high-level id) or low-level operation key.
+  ability_ref: {
+    kind: "ability_id" | "operation_key";
+    value: string;
+  };
+
+  // A summary of input, not necessarily the full payload.
+  input_summary?: string;
+
+  // Optional runtime environment (dev/staging/prod), if known.
+  environment?: string;
+
+  caller: {
+    source: InvocationSource;
+    session_id?: string;
+    job_id?: string;
+    triggered_by?: string;
+  };
+}
+```
+
+Hooks for this event may emit **preflight** signals (available/unavailable + reason) and may block task creation.
+
+#### PreAbilityCallContext (AI‑facing)
+
+```ts
 interface PreAbilityCallContext {
   event_type: "PreAbilityCall";
   session_id?: string;
   ability_id: string;
+
+  // Task key is present for task-based runs.
+  task_key?: string;
+
+  // Optional summarized args / targets.
   args_summary?: string;
+
   caller: {
     source: InvocationSource;
-    session_id?: string; // if ai_session
-    job_id?: string;     // if background_job/ci_pipeline
+    session_id?: string;
+    job_id?: string;
     triggered_by?: string;
   };
-  // Optional: target paths, environment, risk level, etc.
 }
 ```
 
@@ -296,24 +319,16 @@ interface PostAbilityCallContext {
   event_type: "PostAbilityCall";
   session_id?: string;
   ability_id: string;
+  task_key?: string;
   status: "success" | "failure" | "partial";
   duration_ms?: number;
   input_summary?: string;
   output_summary?: string;
-  tool_call_path?: string[]; // nested calls if any
   error_message?: string;
 }
 ```
 
-In many repos, abilities are implemented as local CLI tools or scripts. The runtime is allowed to capture the tool's stdout/stderr and either:
-
-- embed a truncated excerpt into `output_summary`, or
-- store the full stdout in a log file and expose a pointer (e.g. in an
-  implementation-specific field such as `stdout_log_path`).
-
-PostAbilityCall hooks may inspect these values to compute telemetry and quality metrics (for example, detecting frequent error-like outputs or empty results), but this remains an infra-only concern. Any conclusions based on stdout should be written to logs or caches, not fed back into the current AI planning loop.
-
-Hooks here are **infra‑only**: they log, track usage, and update caches. They do **not** send AI‑facing signals for the current turn.
+PostAbilityCall hooks are infra‑only: they log, track usage, and update caches. They do **not** send AI‑facing signals for the current turn.
 
 #### SessionStopContext (infra‑facing)
 
@@ -328,32 +343,24 @@ interface SessionStopContext {
     ability_id: string;
     status: "success" | "failure" | "partial";
   }>;
-  started_at?: string; // ISO timestamp
-  ended_at?: string;   // ISO timestamp
-  // Additional project-specific metadata as needed (for example, per-service stats)
+  started_at?: string;
+  ended_at?: string;
 }
 ```
-
-Hooks may run builds/tests and persist summaries, again as infra‑only operations. Handlers can rely on this context to understand “what happened in this session” without re‑scanning the entire repo or logs.
 
 ### 3.2 HookResult: raw handler output
 
 Each handler writes a JSON object to stdout. The runtime merges all results for an event.
 
-At the low level, a `HookResult` might look like:
-
 ```ts
 interface HookResult {
-  // For infra: logs, telemetry, cache hints
+  // Infra fields: logs, telemetry, cache hints
   logs?: string[];
-
-  // For internal infra use (e.g. marking usage recorded)
   usage_recorded?: boolean;
 
-  // For AI-facing events (PromptSubmit / PreAbilityCall) only:
+  // AI-facing events (PromptSubmit / PreAbilityCreate / PreAbilityCall) only:
   hook_signals?: HookSignal[];
 
-  // Optional error reporting
   error?: {
     code: string;
     message: string;
@@ -361,89 +368,77 @@ interface HookResult {
 }
 ```
 
-- For **PromptSubmit** and **PreAbilityCall**:
-  - Only `hook_signals` (plus optional logs/error) are relevant.
-- For **PostAbilityCall** and **SessionStop**:
-  - Only infra fields (logs, usage_recorded, infra‑specific metadata) are relevant.
-  - Any AI‑facing fields (e.g. `hook_signals`) must be ignored by the runtime.
-
 ### 3.3 HookSignal: AI‑visible signals
 
-To avoid every hook inventing its own schema, we standardize **hook signals** that the runtime passes to the AI developer loop.
+To avoid every hook inventing its own schema, we standardize hook signals.
 
 ```ts
 type HookSignalKind =
-  | "routing_hint"      // PromptSubmit: ability/doc suggestions
-  | "normalized_intent" // PromptSubmit: structured task description
-  | "ability_guard";    // PreAbilityCall: allow/deny/require-human
+  | "routing_hint"       // PromptSubmit: ability/doc suggestions
+  | "normalized_intent"  // PromptSubmit: structured task description
+  | "ability_preflight"  // PreAbilityCreate: availability + preflight result
+  | "ability_guard";     // PreAbilityCall: allow/deny/require-human
 
 interface HookSignal {
-  source_event: "PromptSubmit" | "PreAbilityCall";
+  source_event: "PromptSubmit" | "PreAbilityCreate" | "PreAbilityCall";
   hook_id: string;
   kind: HookSignalKind;
-  code: string; // machine-readable short code
+  code: string;
   severity?: "info" | "warning" | "error";
-  payload: any; // structured per kind (see below)
+  payload: any;
 }
 ```
-
-For clarity:
-
-- `routing_hint` is used to point the AI developer at abilities and knowledge documents, typically derived from `ROUTING.md` and topic route files described in `content_routing.md`.
-- `normalized_intent` carries a structured view of the current task (scope, topic, stage) that aligns with knowledge routing scopes and topics.
-- `ability_guard` represents guardrail-style decisions for ability calls, based on ability registries and ability-level hook bindings (`hooks.pre_call` / `hooks.post_call`) described in `ability_routing.md`.
-
-Hook handlers should prefer using existing routing metadata and ability registries as inputs when emitting these signals, instead of duplicating business logic.
-
 
 #### PromptSubmit hook signals
 
 PromptSubmit hooks may emit:
 
-- `routing_hint`:
+- `routing_hint` (abilities + documents)
+- `normalized_intent` (scope/topic/stage aligned with knowledge routing)
 
-  ```jsonc
-  {
-    "source_event": "PromptSubmit",
-    "hook_id": "skill_activation_prompt",
-    "kind": "routing_hint",
-    "code": "ROUTE_SUGGESTION",
-    "payload": {
-      "suggested_abilities": [
-        {
-          "id": "refactor_code",
-          "reason": "User asked to clean up TypeScript code.",
-          "confidence": 0.92
-        }
-      ],
-      "suggested_documents": [
-        {
-          "path": ".system/docs/pre_commit.md",
-          "reason": "User mentioned pre-commit checks."
-        }
-      ]
-    }
+Example `routing_hint`:
+
+```jsonc
+{
+  "source_event": "PromptSubmit",
+  "hook_id": "prompt_router",
+  "kind": "routing_hint",
+  "code": "ROUTE_SUGGESTION",
+  "payload": {
+    "suggested_abilities": [
+      { "id": "signup_e2e_test", "reason": "User asked for signup regression.", "confidence": 0.91 }
+    ],
+    "suggested_documents": [
+      { "path": "integration/ROUTING.md", "reason": "Cross-module E2E request." }
+    ]
   }
-  ```
+}
+```
 
-- `normalized_intent`:
+#### PreAbilityCreate hook signals
 
-  ```jsonc
-  {
-    "source_event": "PromptSubmit",
-    "hook_id": "intent_normalizer",
-    "kind": "normalized_intent",
-    "code": "INTENT_PARSED",
-    "payload": {
-      "scope": "dev_workflow",
-      "topic": "pre_commit_checks",
-      "stage": "understand",
-      "raw_input_snippet": "Before I commit, what checks should I run?"
-    }
+PreAbilityCreate hooks may emit `ability_preflight` signals:
+
+```jsonc
+{
+  "source_event": "PreAbilityCreate",
+  "hook_id": "nonprod_availability_check",
+  "kind": "ability_preflight",
+  "code": "ABILITY_UNAVAILABLE",
+  "severity": "error",
+  "payload": {
+    "ability_ref": { "kind": "operation_key", "value": "db.write.user_row" },
+    "reason": "Operation is not enabled in prod environments.",
+    "suggestion": "Switch to staging/dev, or request human override."
   }
-  ```
+}
+```
 
-The AI developer is expected to treat these as **high‑confidence hints** for routing and planning on the first turn.
+Interpretation:
+
+- `ABILITY_AVAILABLE` – task creation may proceed (optionally with warnings).
+- `ABILITY_UNAVAILABLE` – no task should be created; return reason.
+- `ABILITY_REQUIRES_HUMAN` – task creation should stop and ask for approval/input.
 
 #### PreAbilityCall hook signals
 
@@ -464,54 +459,36 @@ PreAbilityCall hooks may emit `ability_guard` signals:
 }
 ```
 
-The AI and runtime interpret these as guardrail decisions:
-
-- `ABILITY_ALLOWED` – normal execution may proceed.
-- `ABILITY_DENIED` with `require_human = true` – stop auto‑run and show the reason to a human.
-- `ABILITY_DENIED` with `require_human = false` – mark the ability as “disabled for this session” and plan around it.
-
-For background and CI callers, the runtime may act on `ability_guard` signals without involving the AI at all.
-
 ### 3.4 Event‑level constraints
 
-The Agent Runtime and Tool Runner enforce per‑event constraints on `HookResult` and `HookSignal`:
+The Agent Runtime and Tool Runner enforce per‑event constraints on `HookResult`:
 
-- For `PromptSubmit` and `PreAbilityCall`:
-  - `hook_signals` are allowed and passed to the AI in the turn context.
+- For `PromptSubmit`, `PreAbilityCreate`, and `PreAbilityCall`:
+  - `hook_signals` are allowed and may be surfaced to the AI (either as part of turn context or as part of tool/task responses).
 - For `PostAbilityCall` and `SessionStop`:
-  - Any AI‑facing fields (e.g. `hook_signals`) are ignored (and optionally logged as a misconfiguration).
-
-This ensures that **only decision‑before events may influence the current turn**, while post‑processing events remain infra‑only.
+  - Any AI‑facing fields (e.g. `hook_signals`) are ignored (and optionally logged as misconfiguration).
 
 ---
 
 ## 4. Agent Runtime Behavior
 
-The Agent Runtime is the **single source of truth** for when session-level events are emitted and how hooks are orchestrated around AI turns. The AI developer never calls hooks directly; it only sees:
+The Agent Runtime is the **single source of truth** for when session-level events are emitted and how hooks are orchestrated around AI turns.
 
-- Inputs that have already been processed by blocking hooks.
-- Structured `hook_signals` attached to the turn context.
-- A small **control message** indicating that a turn is ready to begin.
+### 4.1 Turn pipeline (PromptSubmit)
 
-### 4.1 Turn pipeline and blocking hooks
-
-High‑level pseudocode for the main loop:
+High-level pseudocode for the start of a turn:
 
 ```ts
 async function handleUserInput(rawInput: string, session: SessionState) {
-  // 1. Emit PromptSubmit and run blocking hooks
   const promptCtx = buildPromptSubmitContext(rawInput, session);
   const promptResults = await runHooks("PromptSubmit", promptCtx, { blockingOnly: true });
   const promptSignals = collectHookSignals(promptResults);
 
-  // 2. Build turn context for the AI developer
   const turnContext = {
     user_raw_input: rawInput,
     hook_signals: promptSignals,
-    // ... other session state (files, history, etc.)
   };
 
-  // 3. Emit control message: turn is ready
   const startControl = {
     type: "control",
     turn_ready: true,
@@ -519,154 +496,48 @@ async function handleUserInput(rawInput: string, session: SessionState) {
     hook_signals: promptSignals,
   };
 
-  // 4. Call the AI planner with the ready signal + context
   const plan = await callAiPlanner(startControl, turnContext);
 
-  // 5. Execute planned ability calls
-  for (const step of plan.steps) {
-    const preCtx = buildPreAbilityCallContext(step, session);
-    const preResults = await runHooks("PreAbilityCall", preCtx, { blockingOnly: true });
-    const preSignals = collectHookSignals(preResults);
-
-    const abilityControl = {
-      type: "control",
-      turn_ready_for_ability: true,
-      ability_id: step.ability_id,
-      source_event: "PreAbilityCall",
-      hook_signals: preSignals,
-    };
-
-    const guardDecision = interpretAbilityGuards(preSignals, step);
-
-    if (!guardDecision.allow) {
-      await handleGuardrailDecision(guardDecision, step, session);
-      continue;
-    }
-
-    const result = await executeAbility(step);
-
-    const postCtx = buildPostAbilityCallContext(step, result, session);
-    // PostAbilityCall hooks are infra-only
-    runHooks("PostAbilityCall", postCtx, { blockingOnly: false }); // fire-and-forget or awaited infra
-  }
-
-  // 6. If the session should stop, run SessionStop hooks (infra-only)
-  if (session.shouldStop) {
-    const stopCtx = buildSessionStopContext(session);
-    runHooks("SessionStop", stopCtx, { blockingOnly: false });
-  }
+  // plan may include CREATE_TASK and RUN_TASK steps, handled below...
 }
 ```
 
-Key points:
+### 4.2 Task creation (PreAbilityCreate)
 
-- **PromptSubmit** & **PreAbilityCall**:
-  - Blocking hooks are run synchronously.
-  - Their `hook_signals` are collected and passed to the AI with a **turn‑ready control message**.
-- **PostAbilityCall** & **SessionStop**:
-  - Hooks run as infra; their outputs never modify the current turn’s plan.
+When the AI requests `CREATE_TASK`, the Agent Runtime delegates to the Tool Runner (`task.create`). The Tool Runner:
 
-### 4.2 Execution start signals for the AI
+1. Builds a `PreAbilityCreateContext`
+2. Runs blocking hooks for `PreAbilityCreate`
+3. If denied/unavailable, returns the preflight result
+4. If allowed, allocates a task key and persists the task
 
-To remove ambiguity for the AI developer, the runtime always sends an explicit **start signal** when a turn or ability execution is ready to proceed.
+The Agent Runtime should surface the preflight result to the AI as part of the `CREATE_TASK` response (and may also log it in session state).
 
-Examples:
+### 4.3 Task execution (PreAbilityCall / PostAbilityCall)
 
-- For planning a new turn:
+When the AI requests `RUN_TASK`, the Tool Runner:
 
-  ```jsonc
-  {
-    "type": "control",
-    "turn_ready": true,
-    "source_event": "PromptSubmit",
-    "hook_signals": [ /* routing_hint / normalized_intent */ ]
-  }
-  ```
+1. Builds a `PreAbilityCallContext`
+2. Runs blocking hooks for `PreAbilityCall`
+3. Interprets `ability_guard` signals
+4. Executes the ability if allowed
+5. Emits `PostAbilityCall` and runs infra-only hooks
 
-- For executing a specific ability step:
+### 4.4 Background and non‑AI callers
 
-  ```jsonc
-  {
-    "type": "control",
-    "turn_ready_for_ability": true,
-    "ability_id": "refactor_code",
-    "source_event": "PreAbilityCall",
-    "hook_signals": [ /* ability_guard or empty */ ]
-  }
-  ```
+Abilities may also be invoked by cron/background jobs, CI pipelines, or manual CLI scripts.
 
-The AI must treat these control messages as the **only legitimate start signal** for:
+To keep hooks effective in these scenarios:
 
-- Beginning a planning step (PromptSubmit).
-- Executing a planned ability call (PreAbilityCall).
-
-If `turn_ready` / `turn_ready_for_ability` is absent or false, the AI should assume that hooks are still running or that the call is not allowed.
-
-### 4.3 Background and non‑AI callers
-
-Abilities may also be invoked by:
-
-- Cron / background jobs.
-- CI pipelines.
-- Manual CLI scripts.
-
-To keep PreAbilityCall hooks effective in these scenarios:
-
-- All ability invocations must go through the **Tool Runner API or CLI**, e.g.:
-  - `execute_ability(ability_id, args, invocation_source)`
-  - `tool_runner --ability apply_migration --source background_job`
-- The Tool Runner:
-  - Builds a `PreAbilityCallContext` with `caller.source` set appropriately.
-  - Runs `runHooks("PreAbilityCall", ctx)` synchronously.
-  - Interprets `ability_guard` signals to allow/deny execution.
-
-This guarantees that hook-based guardrails and pre‑flight checks are applied **consistently** across AI and non‑AI callers.
+- All invocations must go through the Tool Runner API/CLI.
+- The Tool Runner sets `caller.source` appropriately.
+- Guardrails and preflight hooks apply consistently across AI and non-AI callers.
 
 ---
 
-### 4.4 From the AI developer’s perspective
+## 5. Patterns and Recipes
 
-From the AI developer’s point of view, hooks show up only as structured context:
-
-- Each planning turn begins after a `PromptSubmit` event, with `hook_signals` (such as `routing_hint` and `normalized_intent`) already attached to the turn input.
-- Each ability step begins after a `PreAbilityCall` event, with any `ability_guard` signals already applied by the runtime.
-- The AI should treat the explicit `turn_ready` / `turn_ready_for_ability` control messages as the only valid start signal for planning or executing a step, and assume that hooks are still running if those flags are absent.
-- `PostAbilityCall` and `SessionStop` hooks never modify the current turn; they only influence logs, caches, and future sessions.
-
-This perspective keeps the internal understand → plan → act → review loop simple: the AI plans against a fully prepared context and does not need to reason about hook lifecycles directly.
-
-## 5. Hook Scaffolding (for humans and AIs)
-
-Writing hook YAML and handler scripts by hand can be tedious. To make hooks easy to adopt, we recommend a dedicated **scaffold workflow**, e.g. an ability called `scaffold_hook`.
-
-Typical scaffold flow:
-
-1. A human or the AI describes the desired hook in natural language:
-   - Event type (`PromptSubmit`, `PreAbilityCall`, etc.).
-   - High‑level intent (logging, guardrail, routing hint).
-   - Whether it should be blocking.
-   - Matching rules (ability_scope, changed_paths, etc.).
-2. The scaffold workflow asks follow‑up questions to fill in required fields.
-3. It generates:
-   - `.system/hooks/<id>.yaml` (following the schema above).
-   - A handler stub under `./scripts/hooks/<id>.{py|sh|ts}`.
-4. It calls a **registration/validation script**, e.g.:
-   - `./scripts/hooks/register_hooks.py --validate`
-   - to ensure YAML parses, event_type is valid, and handler path exists.
-5. It returns a short summary of what was created and how to test it.
-
-Important constraints:
-
-- The scaffold can be AI‑driven, but the **registration and hook runtime logic (Agent Runtime + Tool Runner + Hook Runner) remain deterministic scripts**.
-- Broken hooks should be caught by the registration/validation step, not in the middle of an AI session.
-
----
-
-## 6. Patterns and Recipes
-
-This section outlines common patterns to implement with hooks.
-
-### 6.1 Telemetry and usage tracking (PostAbilityCall)
+### 5.1 Telemetry and usage tracking (PostAbilityCall)
 
 - **Event**: `PostAbilityCall`  
 - **blocking**: `false`  
@@ -680,10 +551,6 @@ event_type: PostAbilityCall
 enabled: true
 blocking: false
 
-summary: >
-  Track each ability call and update ability_usage.json. For slow calls,
-  append to slow_abilities.log.
-
 match:
   ability_scope: "*"
 
@@ -693,17 +560,9 @@ handler:
 
 effects:
   - update_usage_cache: .system/cache/ability_usage.json
-  - append_to: .system/logs/slow_abilities.log
 ```
 
-The handler:
-
-- Reads the context (`ability_id`, `status`, `duration_ms`, etc.).
-- Optionally inspects a truncated view or log pointer for the tool's stdout (via `output_summary` or a repo-specific field) to derive basic quality metrics.
-- Appends a telemetry row to a log or updates a small JSON cache.
-- Returns a `HookResult` with only infra‑relevant fields (e.g. `usage_recorded: true`).
-
-### 6.2 Ability activation hints (PromptSubmit)
+### 5.2 Ability and document suggestions (PromptSubmit)
 
 - **Event**: `PromptSubmit`  
 - **blocking**: `true`  
@@ -712,37 +571,55 @@ The handler:
 Typical YAML:
 
 ```yaml
-id: skill_activation_prompt
+id: prompt_router
 event_type: PromptSubmit
 enabled: true
 blocking: true
 
 summary: >
-  Analyze the incoming user message and suggest a small set of relevant
-  abilities and documents as routing hints.
+  Suggest a small set of relevant abilities and documents as routing hints.
 
 handler:
   kind: script
-  command: ./scripts/hooks/skill_activation_prompt.sh
+  command: ./scripts/hooks/prompt_router.py
 
 effects:
   - suggest_abilities
+  - suggest_documents
   - emit_normalized_intent
 ```
 
-The handler:
+### 5.3 Availability / preflight checks (PreAbilityCreate)
 
-- Reads `user_raw_input` and optionally other session metadata.
-- Produces `HookSignal` objects of kind `routing_hint` and `normalized_intent`.
-- Returns them in `hook_signals` inside the `HookResult`.
+- **Event**: `PreAbilityCreate`  
+- **blocking**: `true`  
+- **Goal**: block task creation when an ability is not callable in the current env/config.
 
-The runtime merges these signals and includes them in the `turn_ready` control message for the AI.
+Typical YAML:
 
-### 6.3 Safety and permission checks (PreAbilityCall)
+```yaml
+id: nonprod_availability_check
+event_type: PreAbilityCreate
+enabled: true
+blocking: true
+
+match:
+  ability_scope: "*"
+
+handler:
+  kind: script
+  command: ./scripts/hooks/nonprod_availability_check.py
+
+effects:
+  - enforce_environment_availability
+  - validate_minimum_config
+```
+
+### 5.4 Safety and permission checks (PreAbilityCall)
 
 - **Event**: `PreAbilityCall`  
 - **blocking**: `true`  
-- **Goal**: prevent dangerous or misconfigured ability calls.
+- **Goal**: prevent dangerous or misconfigured ability executions.
 
 Typical YAML:
 
@@ -751,9 +628,6 @@ id: prod_config_guard
 event_type: PreAbilityCall
 enabled: true
 blocking: true
-
-summary: >
-  Prevent editing of production configuration files from AI sessions.
 
 match:
   ability_scope: "edit_file"
@@ -766,22 +640,11 @@ effects:
   - enforce_prod_safety
 ```
 
-The handler:
-
-- Checks `caller.source` and target paths (from context or args).
-- If unsafe, emits an `ability_guard` signal with `ABILITY_DENIED` and a reason.
-- If safe, emits `ABILITY_ALLOWED` (or no signal).
-
-The runtime interprets `ability_guard` signals to:
-
-- Allow or deny the ability call.
-- Potentially stop auto‑run and surface a message to a human.
-
-### 6.4 Build/test aggregation and summaries at SessionStop
+### 5.5 Build/test aggregation and summaries at SessionStop
 
 - **Event**: `SessionStop`  
 - **blocking**: usually `false` (for AI)  
-- **Goal**: run per‑service build/test for changed components and summarize results, plus other infra-only end‑of‑session tasks.
+- **Goal**: run lightweight build/test commands and persist summaries.
 
 Typical YAML:
 
@@ -790,10 +653,6 @@ id: session_stop_build_check
 event_type: SessionStop
 enabled: true
 blocking: false
-
-summary: >
-  On session stop, run lightweight build or test commands for changed
-  services and summarize any blocking issues.
 
 match:
   only_if_changed_paths:
@@ -809,27 +668,13 @@ effects:
   - summarize_errors_for_humans
 ```
 
-The handler:
-
-- Groups `changed_files` into services/apps.
-- Runs corresponding build/test commands.
-- Writes a summary report to a log or file for humans / future sessions.
-
-SessionStop hooks are also a good place to implement other infra‑only patterns, such as:
-
-- Writing a short session summary into a designated workdocs or summary file, based on `abilities_used` and `tasks_summary`.
-- Refreshing caches or derived artifacts (for example, search indexes or ability usage indexes) using `changed_files`, and storing results under `.system/cache/...`.
-- Performing lightweight risk/compliance scans on the touched areas (for example, checking whether sensitive config paths were modified) and logging any warnings for human review.
-
-These hooks do **not** alter decisions already made in the session; they only prepare data for follow‑up work.
-
 ---
 
-## 7. Observability, Debugging, and Governance
+## 6. Observability, Debugging, and Governance
 
 Hooks can improve observability but can also become a source of confusion if not governed carefully.
 
-### 7.1 Listing hooks
+### 6.1 Listing hooks
 
 Provide a simple command or ability to list all registered hooks, e.g.:
 
@@ -850,7 +695,7 @@ session_stop_build_check SessionStop    true    false    paths=services/**,apps/
 
 This helps both humans and the AI quickly understand what infra is in play.
 
-### 7.2 Logging
+### 6.2 Logging
 
 Hooks should log enough to debug issues without overwhelming logs:
 
@@ -861,20 +706,20 @@ Hooks should log enough to debug issues without overwhelming logs:
   - `duration_ms`
 - For blocking hooks, log when they **deny** or **require human** decisions.
 
-### 7.3 Handling failures and noise
+### 6.3 Handling failures and noise
 
 - **Blocking hooks**:
   - On failure, the runtime may:
     - Treat it as a soft failure and skip the hook (logging an error), or
     - Fail the event entirely, depending on configuration.
-  - For guardrails, prefer explicit `ability_guard` signals over throwing exceptions.
+  - For guardrails, prefer explicit `ability_guard` or `ability_preflight` signals over throwing exceptions.
 - **Non‑blocking hooks**:
   - Failures should not block AI progress.
   - Log errors and continue.
 
 If a hook becomes too noisy (e.g., constantly denying calls the team considers safe), treat it as a design issue and revisit its logic or matching rules.
 
-### 7.4 Avoiding hook sprawl
+### 6.4 Avoiding hook sprawl
 
 To keep `.system/hooks/` manageable:
 
@@ -885,24 +730,9 @@ To keep `.system/hooks/` manageable:
 
 ---
 
-## 8. Design Principles (Recap)
+## 7. Design Principles (Recap)
 
-- **AI‑centric but infra‑driven**  
-  - The AI is the main developer; the runtime and hooks provide guardrails and automation around it.
-
-- **Event‑driven and explicit**  
-  - Hooks attach to well‑defined events. Only `PromptSubmit` and `PreAbilityCall` may directly influence the AI’s current turn.
-
-- **Blocking vs non‑blocking is a first‑class concept**  
-  - Blocking hooks run synchronously and may change whether a turn or ability proceeds. Non‑blocking hooks never affect the current decision loop.
-
-- **Repository‑local and incremental**  
-  - Hooks live in `.system/hooks/` alongside docs, abilities, and scripts. They can be adopted one by one.
-
-- **Scaffoldable and maintainable**  
-  - A dedicated `scaffold_hook` flow makes it easy for humans and AIs to create hooks that are valid by construction.
-
-- **Predictable AI collaboration**  
-  - The AI only acts after receiving explicit `turn_ready` control signals, with `hook_signals` attached. It never has to guess whether hooks have finished, nor does it see mixed messages from post‑processing events.
-
-This design aims to make hooks a **small, predictable extension point** that helps the AI developer work safely and effectively, without entangling core workflows in ad‑hoc prompt glue.
+- Hooks are **event-driven infrastructure**: they wrap the AI’s work with routing hints, guardrails, telemetry, and summaries.
+- Only `PromptSubmit`, `PreAbilityCreate`, and `PreAbilityCall` may shape the current turn or a tool call.
+- `PostAbilityCall` and `SessionStop` are infra-only: they should not modify the current planning loop.
+- Keep `match` blocks small and stable; encode routing suggestions in routing docs and registry metadata, surfaced by a small number of routing hooks.

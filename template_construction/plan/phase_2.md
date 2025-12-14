@@ -47,13 +47,15 @@ Each block has specific deliverables and review points.
 
 ## 4. Block A – DOCS_CONVENTION.md
 
+This document will be used as part of our AI reading strategy going forward，please keep it AI-friendly：write in a clear structure manner， organize the content into chapters and provide a table of contents.
+
 ### 4.1 Purpose
 
 `DOCS_CONVENTION.md` is the **single source of truth** for documentation roles and naming conventions. External AIs will rely on it whenever they need to create or modify docs.
 
 ### 4.2 Required Content
 
-Ensure `DOCS_CONVENTION.md` covers at least:
+Please refer to the documentation `reference/documentation_standards.md` during the build process. Ensure `DOCS_CONVENTION.md` covers at least:
 
 1. **Document types and roles**  
    - `README.md` – human-facing, area overview, no AI behavior rules.  
@@ -133,9 +135,9 @@ Add a checklist entry in `todolist.md` for each AGENTS file and mark them done a
 
 ### 6.1 Target Files
 
-Populate the following files with initial, AI-readable content (not just TODO):
+Populate the following files with initial, **AI-readable** content (not just TODO):
 
-- `knowledge/README.md` – explains the purpose and structure of `knowledge/`.  
+- `knowledge/AGENTS.md` – explains the purpose and structure of `knowledge/`.  
 - `knowledge/architecture/overview.md` – high-level architecture overview (modular structure, registries, routing, hooks, DevOps).  
 - `knowledge/modules/template/layout.md` – standard module layout description.  
 - `knowledge/modules/template/manifest_fields.md` – description of MANIFEST.yaml fields and constraints.  
